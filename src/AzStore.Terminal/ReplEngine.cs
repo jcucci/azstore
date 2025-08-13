@@ -12,7 +12,7 @@ public class ReplEngine
         _theme = settings.Value.Theme;
     }
 
-    public Task StartAsync(CancellationToken cancellationToken = default)
+    public async Task StartAsync(CancellationToken cancellationToken = default)
     {
         WriteStatus("AzStore CLI - Azure Blob Storage Terminal");
         WriteStatus("Type :help for commands or :exit to quit");
@@ -20,8 +20,20 @@ public class ReplEngine
         while (!cancellationToken.IsCancellationRequested)
         {
             WritePrompt("> ");
-            var input = Console.ReadLine();
             
+            string? input;
+            try
+            {
+                input = await Console.In.ReadLineAsync().ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            
+            if (cancellationToken.IsCancellationRequested)
+                break;
+                
             if (string.IsNullOrWhiteSpace(input))
                 continue;
                 
@@ -46,8 +58,6 @@ public class ReplEngine
             
             WriteError($"Unknown command: {input}");
         }
-        
-        return Task.CompletedTask;
     }
 
     // TODO: Refactor these console writing methods to a shared ConsoleWriter class
@@ -68,7 +78,7 @@ public class ReplEngine
 
     private void WriteError(string message)
     {
-        WriteColored(message, "Red");
+        WriteColored(message, nameof(ConsoleColor.Red));
     }
 
     private void WriteColored(string message, string colorName)

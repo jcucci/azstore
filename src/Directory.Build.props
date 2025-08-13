@@ -26,5 +26,5 @@
     <DefineConstants>TRACE</DefineConstants>
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
-  </PropertyGroup>
+  </PropertyGroup> 
 </Project>

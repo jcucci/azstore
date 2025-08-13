@@ -39,13 +39,35 @@ public class Program
 
     private static void ConfigureConfiguration(IConfigurationBuilder configuration)
     {
-        var configDir = GetConfigurationDirectory();
-        var configPath = Path.Combine(configDir, "azstore.toml");
+        try
+        {
+            var configDir = GetConfigurationDirectory();
+            Directory.CreateDirectory(configDir);
+            var configPath = Path.Combine(configDir, "azstore.toml");
 
-        configuration
-            .AddJsonFile("appsettings.json", optional: true)
-            .AddTomlFile(configPath, optional: true)
-            .AddEnvironmentVariables("AZSTORE_");
+            configuration
+                .AddJsonFile("appsettings.json", optional: true)
+                .AddTomlFile(configPath, optional: true)
+                .AddEnvironmentVariables("AZSTORE_");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            Console.WriteLine($"Warning: Cannot access configuration directory: {ex.Message}");
+            Console.WriteLine("Using default configuration without file-based settings.");
+            
+            configuration
+                .AddJsonFile("appsettings.json", optional: true)
+                .AddEnvironmentVariables("AZSTORE_");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Warning: Configuration directory setup failed: {ex.Message}");
+            Console.WriteLine("Using default configuration without file-based settings.");
+            
+            configuration
+                .AddJsonFile("appsettings.json", optional: true)
+                .AddEnvironmentVariables("AZSTORE_");
+        }
     }
 
     private static void ConfigureSerilog(IConfiguration configuration)
@@ -63,19 +85,37 @@ public class Program
 
         if (loggingSettings.EnableFileLogging)
         {
-            var logFilePath = loggingSettings.LogFilePath ?? GetDefaultLogFilePath();
-            var logDirectory = Path.GetDirectoryName(logFilePath);
-            
-            if (!string.IsNullOrEmpty(logDirectory))
+            try
             {
-                Directory.CreateDirectory(logDirectory);
-            }
+                var logFilePath = loggingSettings.LogFilePath ?? GetDefaultLogFilePath();
+                var logDirectory = Path.GetDirectoryName(logFilePath);
+                
+                if (!string.IsNullOrEmpty(logDirectory))
+                {
+                    Directory.CreateDirectory(logDirectory);
+                }
 
-            loggerConfig.WriteTo.File(
-                logFilePath,
-                rollOnFileSizeLimit: true,
-                fileSizeLimitBytes: loggingSettings.MaxFileSizeBytes,
-                retainedFileCountLimit: loggingSettings.RetainedFileCountLimit);
+                loggerConfig.WriteTo.File(
+                    logFilePath,
+                    rollOnFileSizeLimit: true,
+                    fileSizeLimitBytes: loggingSettings.MaxFileSizeBytes,
+                    retainedFileCountLimit: loggingSettings.RetainedFileCountLimit);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                Console.WriteLine($"Warning: Cannot create log directory due to insufficient permissions: {ex.Message}");
+                Console.WriteLine("File logging disabled. Console logging will continue.");
+            }
+            catch (DirectoryNotFoundException ex)
+            {
+                Console.WriteLine($"Warning: Cannot create log directory - path not found: {ex.Message}");
+                Console.WriteLine("File logging disabled. Console logging will continue.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Warning: Failed to configure file logging: {ex.Message}");
+                Console.WriteLine("File logging disabled. Console logging will continue.");
+            }
         }
 
         Log.Logger = loggerConfig.CreateLogger();
