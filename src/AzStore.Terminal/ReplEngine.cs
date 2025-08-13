@@ -1,4 +1,5 @@
 using AzStore.Configuration;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace AzStore.Terminal;
@@ -6,58 +7,69 @@ namespace AzStore.Terminal;
 public class ReplEngine
 {
     private readonly ThemeSettings _theme;
+    private readonly ILogger<ReplEngine> _logger;
 
-    public ReplEngine(IOptions<AzStoreSettings> settings)
+    public ReplEngine(IOptions<AzStoreSettings> settings, ILogger<ReplEngine> logger)
     {
         _theme = settings.Value.Theme;
+        _logger = logger;
     }
 
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
+        _logger.LogInformation("Starting REPL session");
         WriteStatus("AzStore CLI - Azure Blob Storage Terminal");
         WriteStatus("Type :help for commands or :exit to quit");
-        
+
         while (!cancellationToken.IsCancellationRequested)
         {
             WritePrompt("> ");
-            
+
             string? input;
             try
             {
-                input = await Console.In.ReadLineAsync().ConfigureAwait(false);
+                input = await Console.In.ReadLineAsync(cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
                 break;
             }
-            
+
             if (cancellationToken.IsCancellationRequested)
                 break;
-                
+
             if (string.IsNullOrWhiteSpace(input))
                 continue;
-                
+
             // TODO: Refactor command handling to separate command processor classes
             if (input == ":exit" || input == ":q")
+            {
+                _logger.LogInformation("User initiated exit via command: {Command}", input);
                 break;
-                
+            }
+
             if (input == ":help")
             {
+                _logger.LogDebug("User requested help");
                 WriteInfo("Available commands:");
                 WriteInfo("  :help - Show this help message");
                 WriteInfo("  :exit, :q - Exit the application");
                 WriteInfo("  :ls, :list - List downloaded files");
                 continue;
             }
-            
+
             if (input == ":ls" || input == ":list")
             {
+                _logger.LogDebug("User requested file list");
                 WriteInfo("No files downloaded yet.");
                 continue;
             }
-            
+
+            _logger.LogWarning("User entered unknown command: {Command}", input);
             WriteError($"Unknown command: {input}");
         }
+
+        _logger.LogInformation("REPL session ended");
     }
 
     // TODO: Refactor these console writing methods to a shared ConsoleWriter class

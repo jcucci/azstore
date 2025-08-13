@@ -1,0 +1,76 @@
+# AzStore Configuration Example
+# This file should be placed at:
+# - Windows: %APPDATA%\azstore\azstore.toml
+# - macOS: ~/.config/azstore/azstore.toml  
+# - Linux: ~/.config/azstore/azstore.toml
+
+[AzStore]
+# Directory where session data and downloaded files are stored
+# Defaults to ~/Documents/azstore
+sessions_directory = "~/Documents/azstore"
+
+# Default Azure Storage Account to connect to
+# If not specified, you'll be prompted to select one
+default_storage_account = "mystorageaccount"
+
+# How to handle file conflicts when downloading
+# Options: "overwrite", "skip", "rename"
+on_file_conflict = "overwrite"
+
+# Command aliases for convenience
+[AzStore.aliases]
+# Create shortcuts for commonly used commands
+ll = ":ls"
+quit = ":exit"
+download = ":get"
+
+# Keyboard bindings configuration
+[AzStore.key_bindings]
+# Navigate up in lists (default: "k")
+up = "k"
+# Navigate down in lists (default: "j")
+down = "j"
+# Enter/select item (default: "l")
+enter = "l"
+# Go back/up one level (default: "h")
+back = "h"
+# Alternative exit key (default: "q")
+exit = "q"
+
+# Theme and color settings
+[AzStore.theme]
+# Color for command prompt (default: "Cyan")
+prompt_color = "Cyan"
+# Color for status messages (default: "Green")
+status_message_color = "Green"
+# Color for error messages (default: "Red")
+error_color = "Red"
+# Color for highlighted selections (default: "Yellow")
+selection_color = "Yellow"
+
+# Logging configuration
+[AzStore.logging]
+# Minimum log level to capture
+# Options: "Verbose", "Debug", "Information", "Warning", "Error", "Fatal"
+log_level = "Information"
+
+# Enable console logging (useful during development)
+enable_console_logging = true
+
+# Enable file logging (recommended for troubleshooting)
+enable_file_logging = true
+
+# Custom log file path (optional)
+# If not specified, uses platform-specific defaults:
+# - Windows: %LOCALAPPDATA%\azstore\logs\azstore.log
+# - macOS: ~/Library/Logs/azstore/azstore.log
+# - Linux: ~/.local/share/azstore/logs/azstore.log
+# log_file_path = "/custom/path/to/azstore.log"
+
+# Maximum size of each log file before rotation (in bytes)
+# Default: 10MB (10 * 1024 * 1024)
+max_file_size_bytes = 10485760
+
+# Number of old log files to keep after rotation
+# Default: 7 (keeps about a week of daily logs)
+retained_file_count_limit = 7
