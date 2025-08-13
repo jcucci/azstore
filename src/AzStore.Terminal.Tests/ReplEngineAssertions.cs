@@ -1,0 +1,12 @@
+using AzStore.Terminal;
+using Xunit;
+
+namespace AzStore.Terminal.Tests;
+
+public static class ReplEngineAssertions
+{
+    public static void InstanceCreated(ReplEngine engine)
+    {
+        Assert.NotNull(engine);
+    }
+}

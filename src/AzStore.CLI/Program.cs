@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Serilog;
+using Serilog.Formatting.Compact;
 using Tomlyn.Extensions.Configuration;
 
 namespace AzStore.CLI;
@@ -80,7 +81,8 @@ public class Program
 
         if (loggingSettings.EnableConsoleLogging)
         {
-            loggerConfig.WriteTo.Console();
+            loggerConfig.WriteTo.Console(
+                outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}");
         }
 
         if (loggingSettings.EnableFileLogging)
