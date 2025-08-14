@@ -17,7 +17,7 @@ public static class ServiceCollectionExtensions
             .ValidateOnStart();
 
         services.AddSingleton<BlobService>();
-        services.AddSingleton<ReplEngine>();
+        services.AddSingleton<IReplEngine, ReplEngine>();
 
         services.AddTransient<ICommand, ExitCommand>();
         services.AddTransient<ICommand, HelpCommand>();

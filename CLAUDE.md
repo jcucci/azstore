@@ -6,16 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 azstore is a .NET 9 terminal application that provides a command-line REPL interface for interacting with Azure Blob Storage. The application allows cloud engineers, developers, and operations personnel to authenticate, browse containers and blobs, and download files using a keyboard-driven workflow with VIM-like keybindings.
 
-## Key Requirements from PRD
+## Key Requirements
 
-- Terminal-based REPL for Azure Blob Storage interaction
-- Session-based workflow with configurable local directory structure
-- VIM-like navigation keybindings (j/k for up/down, l/Enter to enter, h/Backspace to go back)
-- Azure CLI authentication integration
-- File download capability with mirrored directory structure
-- Built-in commands prefixed with colon (:ls, :help, :exit, :q)
-- Cross-platform compatibility (Windows, macOS, Linux)
-- Configuration file support with customizable settings
+- Terminal-based REPL for Azure Blob Storage with VIM-like navigation (j/k/h/l keys)
+- Session-based workflow with Azure CLI authentication
+- File download with mirrored directory structure and conflict resolution
+- Cross-platform compatibility with TOML configuration support
+- Extensible command system with colon-prefixed built-ins (:ls, :help, :exit, :q)
 
 ## Current Architecture
 
@@ -40,25 +37,12 @@ The project uses a layered architecture with the following components:
 - **Logging**: Serilog with console and file sinks, structured logging
 - **Configuration**: Microsoft.Extensions.Configuration with TOML support
 - **Azure Integration**: Azure.Storage.Blobs SDK
-- **Testing**: xUnit with NSubstitute for mocking, comprehensive command system tests
+- **Testing**: xUnit with standard assertions, NSubstitute for mocking
 - **Development**: VS Code integration with comprehensive debugging support
 
-## Configuration Management
+## Configuration
 
-The application supports hierarchical configuration:
-
-1. **appsettings.json**: Base application settings
-2. **TOML config**: User-specific settings at:
-   - Windows: `%APPDATA%\azstore\azstore.toml`
-   - macOS/Linux: `~/.config/azstore/azstore.toml`
-3. **Environment Variables**: Prefixed with `AZSTORE_`
-
-Key configuration areas:
-- Logging levels and output targets
-- Theme and color customization
-- Key binding mappings
-- File conflict resolution behavior
-- Session directory management
+Hierarchical configuration: appsettings.json → TOML config (`%APPDATA%\azstore\azstore.toml` or `~/.config/azstore/azstore.toml`) → `AZSTORE_*` environment variables. Covers logging, themes, key bindings, file conflicts, and session management.
 
 ## Command System Architecture
 
@@ -99,8 +83,8 @@ public class MyCommand : ICommand
 ### Testing Strategy
 - **Test Architecture**: Fixture and Assertions pattern for clean test organization
 - **Mocking**: NSubstitute for dependency substitution
-- **Coverage**: Basic unit tests for all major components
-- **Naming**: Avoid behavioral naming in assertions (e.g., `DefaultsSet` vs `ShouldHaveDefaults`)
+- **Assertions**: Standard xUnit assertions only (no FluentAssertions)
+- **Coverage**: Comprehensive unit tests for all major components
 
 ### Code Standards
 - **Dependency Injection**: Constructor injection with ILogger<T> pattern
@@ -108,7 +92,7 @@ public class MyCommand : ICommand
 - **Error Handling**: Comprehensive exception handling with graceful degradation
 - **Cross-Platform**: Platform-specific path handling for Windows/macOS/Linux
 - **Modern C# Features**: Use C# 12 collection expressions `[]` instead of `new[]` for arrays and simple collections
-- **Testing with xUnit**: Be careful with collection expressions in `Assert.Equal()` - may cause ambiguity between array and span overloads
+- **Testing**: Use standard xUnit assertions (not FluentAssertions), avoid collection expression ambiguity in `Assert.Equal()`
 
 ### VS Code Integration
 Complete development environment setup:
@@ -142,46 +126,39 @@ Complete development environment setup:
 - Theme support with configurable colors
 - Cross-platform path handling
 - Dependency injection container setup
-- **Comprehensive test coverage (52+ tests across all layers)**
+- **Comprehensive test coverage (104+ tests across all layers)**
 - **Modern C# syntax**: Collection expressions used throughout for cleaner array/collection initialization
 
+### ✅ Foundation Phase Complete
+- **Core domain models**: Session, Container, Blob, NavigationState, StorageItem with validation and serialization
+- **Service interfaces**: IStorageService, ISessionManager, IAuthenticationService, IConfigurationService, IReplEngine, ICommandProcessor
+- **Model tests**: 53 comprehensive unit tests with xUnit assertions for all models
+
 ### 🚧 In Development
-- Azure Blob Storage authentication
+- Azure Blob Storage authentication implementation
 - Container and blob enumeration
 - File download functionality
 - VIM-like keyboard navigation
-- Session management
+- Session persistence
 
-### 📋 Planned Features
-- Azure CLI authentication integration
-- Interactive blob browser
+### 📋 Next Phase
+- Azure CLI authentication service implementation
+- Interactive blob browser with VIM navigation
 - File conflict resolution
 - Progress indication for downloads
-- Command history and completion
 
 ## Development Notes
 
-- The project follows Microsoft's recommended practices for .NET hosted services
-- All logging uses structured logging with correlation IDs
-- Configuration changes are hot-reloaded when possible
-- **Command system uses dependency injection for extensibility and testability**
-- **New commands can be added by implementing ICommand and registering in DI**
-- **Command registry automatically discovers and registers all ICommand implementations**
-- The REPL engine delegates command execution to the command registry
-- Error messages are user-friendly with helpful suggestions
-- **Comprehensive test coverage includes unit tests for all command system components**
+- Follows Microsoft .NET hosted services patterns with structured logging and hot-reload configuration
+- Extensible command system: implement `ICommand`, register in DI, automatic discovery via `CommandRegistry`
+- Interface-driven architecture with comprehensive DI container setup
+- **Test coverage**: 104+ tests including comprehensive model validation and edge cases
 
-## Recent Changes and Learnings
+## Recent Implementation (GitHub Issue #4)
 
-### Command System Improvements (Current Session)
-- **CommandRegistry Refactoring**: Improved dependency injection architecture with lazy loading of commands
-- **HelpCommand Enhancement**: Now uses ICommandRegistry instead of direct IServiceProvider access for better separation of concerns
-- **Input Validation**: Added robust null/whitespace checking in CommandRegistry.FindCommand()
-- **Case Sensitivity**: Removed unnecessary case conversion - commands are now case-sensitive by design
-- **Test Coverage**: Extended test suite with edge cases for whitespace and null input handling
-
-### Collection Expressions Migration
-- **Modern Syntax**: Updated all array initializations to use C# 12 collection expressions `[]`
-- **Files Updated**: ExitCommand, ListCommand, CommandRegistryFixture, HelpCommandTests
-- **Testing Gotcha**: Collection expressions can cause `Assert.Equal()` ambiguity in xUnit - use explicit `new[]` syntax when needed
-- **Build Success**: All 52 tests pass after modernization
+### Foundation Phase Complete
+- **Domain Models**: Session, StorageItem, Container, Blob, NavigationState as C# 12 records with validation/serialization
+- **Service Interfaces**: IStorageService, ISessionManager, IAuthenticationService, IConfigurationService, IReplEngine, ICommandProcessor with full XML docs
+- **Architecture**: Interface extraction, improved DI patterns, command registry with lazy loading
+- **Testing**: Migrated from FluentAssertions to standard xUnit assertions, 104+ tests with comprehensive edge case coverage
+- **Quality**: Modern C# 12 syntax, proper async/await patterns, cross-platform compatibility

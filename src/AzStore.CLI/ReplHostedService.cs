@@ -6,12 +6,12 @@ namespace AzStore.CLI;
 
 public class ReplHostedService : BackgroundService
 {
-    private readonly ReplEngine _replEngine;
+    private readonly IReplEngine _replEngine;
     private readonly ILogger<ReplHostedService> _logger;
     private readonly IHostApplicationLifetime _lifetime;
 
     public ReplHostedService(
-        ReplEngine replEngine, 
+        IReplEngine replEngine, 
         ILogger<ReplHostedService> logger,
         IHostApplicationLifetime lifetime)
     {
