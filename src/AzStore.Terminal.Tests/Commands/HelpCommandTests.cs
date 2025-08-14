@@ -1,5 +1,4 @@
 using AzStore.Terminal.Commands;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using Xunit;
@@ -11,8 +10,8 @@ public class HelpCommandTests
     [Fact]
     public void Name_ReturnsHelp()
     {
-        var (logger, serviceProvider) = CreateTestDependenciesWithCommands();
-        var command = new HelpCommand(logger, serviceProvider);
+        var (logger, commandRegistry) = CreateTestDependencies();
+        var command = new HelpCommand(logger, commandRegistry);
         
         Assert.Equal("help", command.Name);
     }
@@ -20,8 +19,8 @@ public class HelpCommandTests
     [Fact]
     public void Aliases_IsEmpty()
     {
-        var (logger, serviceProvider) = CreateTestDependenciesWithCommands();
-        var command = new HelpCommand(logger, serviceProvider);
+        var (logger, commandRegistry) = CreateTestDependencies();
+        var command = new HelpCommand(logger, commandRegistry);
         
         Assert.Empty(command.Aliases);
     }
@@ -29,8 +28,8 @@ public class HelpCommandTests
     [Fact]
     public void Description_IsNotEmpty()
     {
-        var (logger, serviceProvider) = CreateTestDependenciesWithCommands();
-        var command = new HelpCommand(logger, serviceProvider);
+        var (logger, commandRegistry) = CreateTestDependencies();
+        var command = new HelpCommand(logger, commandRegistry);
         
         Assert.False(string.IsNullOrWhiteSpace(command.Description));
     }
@@ -38,8 +37,8 @@ public class HelpCommandTests
     [Fact]
     public async Task ExecuteAsync_ReturnsSuccessResult()
     {
-        var (logger, serviceProvider) = CreateTestDependenciesWithCommands();
-        var command = new HelpCommand(logger, serviceProvider);
+        var (logger, commandRegistry) = CreateTestDependencies();
+        var command = new HelpCommand(logger, commandRegistry);
         
         var result = await command.ExecuteAsync(Array.Empty<string>());
         
@@ -51,8 +50,8 @@ public class HelpCommandTests
     [Fact]
     public async Task ExecuteAsync_LogsDebugMessage()
     {
-        var (logger, serviceProvider) = CreateTestDependenciesWithCommands();
-        var command = new HelpCommand(logger, serviceProvider);
+        var (logger, commandRegistry) = CreateTestDependencies();
+        var command = new HelpCommand(logger, commandRegistry);
         
         await command.ExecuteAsync(Array.Empty<string>());
         
@@ -62,14 +61,18 @@ public class HelpCommandTests
     [Fact]
     public async Task ExecuteAsync_IncludesAllCommands()
     {
-        var services = new ServiceCollection();
-        services.AddTransient<ICommand>(_ => CreateMockCommand("test1", Array.Empty<string>(), "Test command 1"));
-        services.AddTransient<ICommand>(_ => CreateMockCommand("test2", new[] { "t2" }, "Test command 2"));
-        
-        var serviceProvider = services.BuildServiceProvider();
         var logger = Substitute.For<ILogger<HelpCommand>>();
-        var command = new HelpCommand(logger, serviceProvider);
+        var commandRegistry = Substitute.For<ICommandRegistry>();
         
+        var commands = new[]
+        {
+            CreateMockCommand("test1", Array.Empty<string>(), "Test command 1"),
+            CreateMockCommand("test2", ["t2"], "Test command 2")
+        };
+        
+        commandRegistry.GetAllCommands().Returns(commands);
+        
+        var command = new HelpCommand(logger, commandRegistry);
         var result = await command.ExecuteAsync(Array.Empty<string>());
         
         Assert.Contains("test1", result.Message);
@@ -80,27 +83,27 @@ public class HelpCommandTests
     [Fact]
     public async Task ExecuteAsync_FormatsCommandsCorrectly()
     {
-        var services = new ServiceCollection();
-        services.AddTransient<ICommand>(_ => CreateMockCommand("test", new[] { "t" }, "Test description"));
-        
-        var serviceProvider = services.BuildServiceProvider();
         var logger = Substitute.For<ILogger<HelpCommand>>();
-        var command = new HelpCommand(logger, serviceProvider);
+        var commandRegistry = Substitute.For<ICommandRegistry>();
         
+        var commands = new[] { CreateMockCommand("test", ["t"], "Test description") };
+        commandRegistry.GetAllCommands().Returns(commands);
+        
+        var command = new HelpCommand(logger, commandRegistry);
         var result = await command.ExecuteAsync(Array.Empty<string>());
         
         Assert.Contains(":test, :t - Test description", result.Message);
     }
 
-    private static (ILogger<HelpCommand>, IServiceProvider) CreateTestDependenciesWithCommands()
+    private static (ILogger<HelpCommand>, ICommandRegistry) CreateTestDependencies()
     {
-        var services = new ServiceCollection();
-        services.AddTransient<ICommand>(_ => CreateMockCommand("test", Array.Empty<string>(), "Test description"));
-        
-        var serviceProvider = services.BuildServiceProvider();
         var logger = Substitute.For<ILogger<HelpCommand>>();
+        var commandRegistry = Substitute.For<ICommandRegistry>();
         
-        return (logger, serviceProvider);
+        var commands = new[] { CreateMockCommand("test", Array.Empty<string>(), "Test description") };
+        commandRegistry.GetAllCommands().Returns(commands);
+        
+        return (logger, commandRegistry);
     }
 
     private static ICommand CreateMockCommand(string name, string[] aliases, string description)

@@ -4,23 +4,29 @@ namespace AzStore.Terminal.Commands;
 
 public class CommandRegistry : ICommandRegistry
 {
-    private readonly Dictionary<string, ICommand> _commands;
+    private readonly IServiceProvider _serviceProvider;
+    private Dictionary<string, ICommand>? _commands;
 
     public CommandRegistry(IServiceProvider serviceProvider)
     {
-        var commands = serviceProvider.GetServices<ICommand>();
-        _commands = BuildCommandLookup(commands);
+        _serviceProvider = serviceProvider;
     }
+
+    private Dictionary<string, ICommand> Commands => 
+        _commands ??= BuildCommandLookup(_serviceProvider.GetServices<ICommand>());
 
     public ICommand? FindCommand(string commandName)
     {
-        var normalizedName = commandName.TrimStart(':').ToLowerInvariant();
-        return _commands.TryGetValue(normalizedName, out var command) ? command : null;
+        if (string.IsNullOrWhiteSpace(commandName))
+            return null;
+            
+        var normalizedName = commandName.TrimStart(':');
+        return Commands.TryGetValue(normalizedName, out var command) ? command : null;
     }
 
     public IEnumerable<ICommand> GetAllCommands()
     {
-        return _commands.Values.Distinct();
+        return Commands.Values.Distinct();
     }
 
     private static Dictionary<string, ICommand> BuildCommandLookup(IEnumerable<ICommand> commands)
@@ -29,11 +35,11 @@ public class CommandRegistry : ICommandRegistry
         
         foreach (var command in commands)
         {
-            lookup[command.Name.ToLowerInvariant()] = command;
+            lookup[command.Name] = command;
             
             foreach (var alias in command.Aliases)
             {
-                lookup[alias.ToLowerInvariant()] = command;
+                lookup[alias] = command;
             }
         }
         

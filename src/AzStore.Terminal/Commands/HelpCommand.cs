@@ -1,4 +1,3 @@
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace AzStore.Terminal.Commands;
@@ -6,16 +5,16 @@ namespace AzStore.Terminal.Commands;
 public class HelpCommand : ICommand
 {
     private readonly ILogger<HelpCommand> _logger;
-    private readonly IServiceProvider _serviceProvider;
+    private readonly ICommandRegistry _commandRegistry;
 
     public string Name => "help";
     public string[] Aliases => Array.Empty<string>();
     public string Description => "Show this help message";
 
-    public HelpCommand(ILogger<HelpCommand> logger, IServiceProvider serviceProvider)
+    public HelpCommand(ILogger<HelpCommand> logger, ICommandRegistry commandRegistry)
     {
         _logger = logger;
-        _serviceProvider = serviceProvider;
+        _commandRegistry = commandRegistry;
     }
 
     public Task<CommandResult> ExecuteAsync(string[] args, CancellationToken cancellationToken = default)
@@ -28,7 +27,7 @@ public class HelpCommand : ICommand
 
     private string BuildHelpText()
     {
-        var commands = _serviceProvider.GetServices<ICommand>();
+        var commands = _commandRegistry.GetAllCommands();
         var helpLines = commands.Select(FormatCommandHelp);
         
         return "Available commands:\n" + string.Join("\n", helpLines);

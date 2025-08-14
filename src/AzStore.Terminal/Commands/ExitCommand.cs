@@ -7,7 +7,7 @@ public class ExitCommand : ICommand
     private readonly ILogger<ExitCommand> _logger;
 
     public string Name => "exit";
-    public string[] Aliases => new[] { "q" };
+    public string[] Aliases => ["q"];
     public string Description => "Exit the application";
 
     public ExitCommand(ILogger<ExitCommand> logger)

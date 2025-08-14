@@ -7,7 +7,7 @@ public class ListCommand : ICommand
     private readonly ILogger<ListCommand> _logger;
 
     public string Name => "list";
-    public string[] Aliases => new[] { "ls" };
+    public string[] Aliases => ["ls"];
     public string Description => "List downloaded files";
 
     public ListCommand(ILogger<ListCommand> logger)

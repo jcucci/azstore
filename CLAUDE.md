@@ -81,7 +81,7 @@ The application uses an extensible command pattern with dependency injection for
 public class MyCommand : ICommand 
 {
     public string Name => "mycommand";
-    public string[] Aliases => new[] { "mc" };
+    public string[] Aliases => ["mc"];  // Uses C# 12 collection expressions
     public string Description => "Does something useful";
     
     public MyCommand(ILogger<MyCommand> logger) { /* ... */ }
@@ -107,6 +107,8 @@ public class MyCommand : ICommand
 - **Async/Await**: Proper cancellation token propagation
 - **Error Handling**: Comprehensive exception handling with graceful degradation
 - **Cross-Platform**: Platform-specific path handling for Windows/macOS/Linux
+- **Modern C# Features**: Use C# 12 collection expressions `[]` instead of `new[]` for arrays and simple collections
+- **Testing with xUnit**: Be careful with collection expressions in `Assert.Equal()` - may cause ambiguity between array and span overloads
 
 ### VS Code Integration
 Complete development environment setup:
@@ -140,7 +142,8 @@ Complete development environment setup:
 - Theme support with configurable colors
 - Cross-platform path handling
 - Dependency injection container setup
-- **Comprehensive test coverage (45+ tests across all layers)**
+- **Comprehensive test coverage (52+ tests across all layers)**
+- **Modern C# syntax**: Collection expressions used throughout for cleaner array/collection initialization
 
 ### 🚧 In Development
 - Azure Blob Storage authentication
@@ -167,3 +170,18 @@ Complete development environment setup:
 - The REPL engine delegates command execution to the command registry
 - Error messages are user-friendly with helpful suggestions
 - **Comprehensive test coverage includes unit tests for all command system components**
+
+## Recent Changes and Learnings
+
+### Command System Improvements (Current Session)
+- **CommandRegistry Refactoring**: Improved dependency injection architecture with lazy loading of commands
+- **HelpCommand Enhancement**: Now uses ICommandRegistry instead of direct IServiceProvider access for better separation of concerns
+- **Input Validation**: Added robust null/whitespace checking in CommandRegistry.FindCommand()
+- **Case Sensitivity**: Removed unnecessary case conversion - commands are now case-sensitive by design
+- **Test Coverage**: Extended test suite with edge cases for whitespace and null input handling
+
+### Collection Expressions Migration
+- **Modern Syntax**: Updated all array initializations to use C# 12 collection expressions `[]`
+- **Files Updated**: ExitCommand, ListCommand, CommandRegistryFixture, HelpCommandTests
+- **Testing Gotcha**: Collection expressions can cause `Assert.Equal()` ambiguity in xUnit - use explicit `new[]` syntax when needed
+- **Build Success**: All 52 tests pass after modernization

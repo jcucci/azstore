@@ -80,8 +80,52 @@ public class CommandRegistryTests
         var registry = CommandRegistryFixture.CreateWithCommands();
         
         var commands = registry.GetAllCommands().ToList();
-        var distinctCommands = commands.DistinctBy(c => c.GetType()).ToList();
+        var distinctCommands = commands.DistinctBy(c => c.Name).ToList();
         
         Assert.Equal(commands.Count, distinctCommands.Count);
+    }
+
+    [Fact]
+    public void FindCommand_WithNullInput_ReturnsNull()
+    {
+        var registry = CommandRegistryFixture.CreateWithCommands();
+        
+        var result = registry.FindCommand(null!);
+        
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void FindCommand_WithEmptyString_ReturnsNull()
+    {
+        var registry = CommandRegistryFixture.CreateWithCommands();
+        
+        var result = registry.FindCommand("");
+        
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void FindCommand_WithWhitespaceOnly_ReturnsNull()
+    {
+        var registry = CommandRegistryFixture.CreateWithCommands();
+        
+        var result = registry.FindCommand("   ");
+        
+        Assert.Null(result);
+    }
+
+    [Theory]
+    [InlineData("\t")]
+    [InlineData("\n")]
+    [InlineData("\r")]
+    [InlineData(" \t\n ")]
+    public void FindCommand_WithVariousWhitespace_ReturnsNull(string input)
+    {
+        var registry = CommandRegistryFixture.CreateWithCommands();
+        
+        var result = registry.FindCommand(input);
+        
+        Assert.Null(result);
     }
 }
