@@ -1,5 +1,6 @@
 using AzStore.Configuration;
 using AzStore.Terminal;
+using AzStore.Terminal.Commands;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -15,8 +16,9 @@ public static class ReplEngineFixture
         options.Value.Returns(settings);
         
         var logger = Substitute.For<ILogger<ReplEngine>>();
+        var commandRegistry = Substitute.For<ICommandRegistry>();
         
-        return new ReplEngine(options, logger);
+        return new ReplEngine(options, logger, commandRegistry);
     }
 
     public static ReplEngine CreateWithCustomTheme(string promptColor)
@@ -30,7 +32,8 @@ public static class ReplEngineFixture
         options.Value.Returns(settings);
         
         var logger = Substitute.For<ILogger<ReplEngine>>();
+        var commandRegistry = Substitute.For<ICommandRegistry>();
         
-        return new ReplEngine(options, logger);
+        return new ReplEngine(options, logger, commandRegistry);
     }
 }
