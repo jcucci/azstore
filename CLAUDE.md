@@ -36,10 +36,11 @@ The project uses a layered architecture with the following components:
 ### Technical Stack
 - **Target Framework**: .NET 9
 - **Architecture**: Microsoft.Extensions.Hosting with hosted services
+- **Command System**: Extensible command pattern with dependency injection
 - **Logging**: Serilog with console and file sinks, structured logging
 - **Configuration**: Microsoft.Extensions.Configuration with TOML support
 - **Azure Integration**: Azure.Storage.Blobs SDK
-- **Testing**: xUnit with NSubstitute for mocking
+- **Testing**: xUnit with NSubstitute for mocking, comprehensive command system tests
 - **Development**: VS Code integration with comprehensive debugging support
 
 ## Configuration Management
@@ -58,6 +59,40 @@ Key configuration areas:
 - Key binding mappings
 - File conflict resolution behavior
 - Session directory management
+
+## Command System Architecture
+
+The application uses an extensible command pattern with dependency injection for maximum testability and maintainability.
+
+### Core Components
+- **ICommand Interface**: Defines command contract with `Name`, `Aliases`, `Description`, and `ExecuteAsync`
+- **CommandRegistry**: Service that discovers and provides command lookup functionality
+- **CommandResult**: Standardized result type with success status, messages, and exit flags
+- **Built-in Commands**: ExitCommand, HelpCommand, ListCommand
+
+### Adding New Commands
+1. Create a class implementing `ICommand` interface
+2. Add constructor dependencies as needed (logger, services, etc.)
+3. Register as `ICommand` in ServiceCollectionExtensions
+4. Command is automatically discovered and available in REPL
+
+### Example Command Implementation
+```csharp
+public class MyCommand : ICommand 
+{
+    public string Name => "mycommand";
+    public string[] Aliases => new[] { "mc" };
+    public string Description => "Does something useful";
+    
+    public MyCommand(ILogger<MyCommand> logger) { /* ... */ }
+    
+    public Task<CommandResult> ExecuteAsync(string[] args, CancellationToken ct)
+    {
+        // Implementation here
+        return Task.FromResult(CommandResult.Ok("Success!"));
+    }
+}
+```
 
 ## Development Practices
 
@@ -98,11 +133,14 @@ Complete development environment setup:
 - Hosted services architecture with graceful shutdown
 - Comprehensive logging infrastructure with Serilog
 - TOML-based configuration system
-- Basic REPL with command parsing (:help, :exit, :ls)
+- **Extensible command system with dependency injection**
+- **Command registry pattern for easy command addition**
+- **REPL engine with pluggable command architecture**
+- Built-in commands (:help, :exit/:q, :list/:ls)
 - Theme support with configurable colors
 - Cross-platform path handling
 - Dependency injection container setup
-- Unit test framework with NSubstitute
+- **Comprehensive test coverage (45+ tests across all layers)**
 
 ### 🚧 In Development
 - Azure Blob Storage authentication
@@ -123,5 +161,9 @@ Complete development environment setup:
 - The project follows Microsoft's recommended practices for .NET hosted services
 - All logging uses structured logging with correlation IDs
 - Configuration changes are hot-reloaded when possible
-- The REPL engine is designed to be testable and extensible
+- **Command system uses dependency injection for extensibility and testability**
+- **New commands can be added by implementing ICommand and registering in DI**
+- **Command registry automatically discovers and registers all ICommand implementations**
+- The REPL engine delegates command execution to the command registry
 - Error messages are user-friendly with helpful suggestions
+- **Comprehensive test coverage includes unit tests for all command system components**

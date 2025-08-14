@@ -35,7 +35,6 @@
     "editor.wordWrap": "wordWrapColumn",
     "editor.wordWrapColumn": 220,
     // Terminal settings for better CLI experience
-    "terminal.integrated.defaultProfile.linux": "bash",
     "terminal.integrated.cwd": "${workspaceFolder}",
     // File associations
     "files.associations": {

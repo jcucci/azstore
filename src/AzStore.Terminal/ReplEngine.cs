@@ -1,4 +1,5 @@
 using AzStore.Configuration;
+using AzStore.Terminal.Commands;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -8,11 +9,13 @@ public class ReplEngine
 {
     private readonly ThemeSettings _theme;
     private readonly ILogger<ReplEngine> _logger;
+    private readonly ICommandRegistry _commandRegistry;
 
-    public ReplEngine(IOptions<AzStoreSettings> settings, ILogger<ReplEngine> logger)
+    public ReplEngine(IOptions<AzStoreSettings> settings, ILogger<ReplEngine> logger, ICommandRegistry commandRegistry)
     {
         _theme = settings.Value.Theme;
         _logger = logger;
+        _commandRegistry = commandRegistry;
     }
 
     public async Task StartAsync(CancellationToken cancellationToken = default)
@@ -41,38 +44,46 @@ public class ReplEngine
             if (string.IsNullOrWhiteSpace(input))
                 continue;
 
-            // TODO: Refactor command handling to separate command processor classes
-            if (input == ":exit" || input == ":q")
+            if (input.StartsWith(':'))
             {
-                _logger.LogInformation("User initiated exit via command: {Command}", input);
-                break;
+                var command = _commandRegistry.FindCommand(input);
+                if (command != null)
+                {
+                    var args = ParseCommandArgs(input);
+                    var result = await command.ExecuteAsync(args, cancellationToken);
+                    
+                    if (!string.IsNullOrWhiteSpace(result.Message))
+                    {
+                        if (result.Success)
+                            WriteInfo(result.Message);
+                        else
+                            WriteError(result.Message);
+                    }
+                    
+                    if (result.ShouldExit)
+                        break;
+                }
+                else
+                {
+                    _logger.LogWarning("User entered unknown command: {Command}", input);
+                    WriteError($"Unknown command: {input}");
+                }
             }
-
-            if (input == ":help")
+            else
             {
-                _logger.LogDebug("User requested help");
-                WriteInfo("Available commands:");
-                WriteInfo("  :help - Show this help message");
-                WriteInfo("  :exit, :q - Exit the application");
-                WriteInfo("  :ls, :list - List downloaded files");
-                continue;
+                _logger.LogWarning("User entered non-command input: {Input}", input);
+                WriteError("Commands must start with ':'. Type :help for available commands.");
             }
-
-            if (input == ":ls" || input == ":list")
-            {
-                _logger.LogDebug("User requested file list");
-                WriteInfo("No files downloaded yet.");
-                continue;
-            }
-
-            _logger.LogWarning("User entered unknown command: {Command}", input);
-            WriteError($"Unknown command: {input}");
         }
 
         _logger.LogInformation("REPL session ended");
     }
 
-    // TODO: Refactor these console writing methods to a shared ConsoleWriter class
+    private static string[] ParseCommandArgs(string input)
+    {
+        var parts = input.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length > 1 ? parts[1..] : Array.Empty<string>();
+    }
     private void WritePrompt(string message)
     {
         WriteColored(message, _theme.PromptColor);

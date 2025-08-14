@@ -1,6 +1,7 @@
 using AzStore.Configuration;
 using AzStore.Core;
 using AzStore.Terminal;
+using AzStore.Terminal.Commands;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -17,6 +18,11 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton<BlobService>();
         services.AddSingleton<ReplEngine>();
+
+        services.AddTransient<ICommand, ExitCommand>();
+        services.AddTransient<ICommand, HelpCommand>();
+        services.AddTransient<ICommand, ListCommand>();
+        services.AddSingleton<ICommandRegistry, CommandRegistry>();
 
         services.AddHostedService<ReplHostedService>();
 

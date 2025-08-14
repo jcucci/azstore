@@ -5,17 +5,50 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Serilog;
 using Serilog.Formatting.Compact;
+using System.CommandLine;
+using System.CommandLine.Parsing;
 using Tomlyn.Extensions.Configuration;
 
 namespace AzStore.CLI;
 
 public class Program
 {
-    public static async Task Main(string[] args)
+    public static async Task<int> Main(string[] args)
     {
-        var builder = Host.CreateApplicationBuilder(args);
+        var rootCommand = CreateRootCommand();
+        var parseResult = rootCommand.Parse(args);
+        return await parseResult.InvokeAsync();
+    }
+
+    private static RootCommand CreateRootCommand()
+    {
+        var rootCommand = new RootCommand("azstore - Azure Blob Storage terminal interface")
+        {
+            CommandLineOptions.SessionsDirectory,
+            CommandLineOptions.StorageAccount,
+            CommandLineOptions.LogLevel,
+            CommandLineOptions.FileConflict,
+            CommandLineOptions.ConsoleLogging,
+            CommandLineOptions.FileLogging,
+            CommandLineOptions.LogFile,
+            CommandLineOptions.Verbose,
+            CommandLineOptions.Quiet
+        };
+
+        rootCommand.SetAction(async (parseResult, cancellationToken) => 
+        {
+            await RunApplication(parseResult);
+            return 0;
+        });
+        return rootCommand;
+    }
+
+    private static async Task RunApplication(ParseResult parseResult)
+    {
+        var parsedArgs = CommandLineOptions.ExtractConfigurationValues(parseResult);
+        var builder = Host.CreateApplicationBuilder();
         
-        ConfigureConfiguration(builder.Configuration);
+        ConfigureConfiguration(builder.Configuration, parsedArgs);
         ConfigureSerilog(builder.Configuration);
         
         builder.Services.AddSerilog();
@@ -38,7 +71,7 @@ public class Program
         }
     }
 
-    private static void ConfigureConfiguration(IConfigurationBuilder configuration)
+    private static void ConfigureConfiguration(IConfigurationBuilder configuration, Dictionary<string, string?> commandLineArgs)
     {
         try
         {
@@ -49,7 +82,8 @@ public class Program
             configuration
                 .AddJsonFile("appsettings.json", optional: true)
                 .AddTomlFile(configPath, optional: true)
-                .AddEnvironmentVariables("AZSTORE_");
+                .AddEnvironmentVariables("AZSTORE_")
+                .AddInMemoryCollection(commandLineArgs);
         }
         catch (UnauthorizedAccessException ex)
         {
@@ -58,7 +92,8 @@ public class Program
             
             configuration
                 .AddJsonFile("appsettings.json", optional: true)
-                .AddEnvironmentVariables("AZSTORE_");
+                .AddEnvironmentVariables("AZSTORE_")
+                .AddInMemoryCollection(commandLineArgs);
         }
         catch (Exception ex)
         {
@@ -67,7 +102,8 @@ public class Program
             
             configuration
                 .AddJsonFile("appsettings.json", optional: true)
-                .AddEnvironmentVariables("AZSTORE_");
+                .AddEnvironmentVariables("AZSTORE_")
+                .AddInMemoryCollection(commandLineArgs);
         }
     }
 
