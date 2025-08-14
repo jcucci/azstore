@@ -13,6 +13,6 @@ public static class ServiceCollectionExtensionsAssertions
         var serviceProvider = services.BuildServiceProvider();
         
         Assert.NotNull(serviceProvider.GetService<BlobService>());
-        Assert.NotNull(serviceProvider.GetService<ReplEngine>());
+        Assert.NotNull(serviceProvider.GetService<IReplEngine>());
     }
 }

@@ -5,7 +5,7 @@ using Microsoft.Extensions.Options;
 
 namespace AzStore.Terminal;
 
-public class ReplEngine
+public class ReplEngine : IReplEngine
 {
     private readonly ThemeSettings _theme;
     private readonly ILogger<ReplEngine> _logger;
@@ -41,42 +41,48 @@ public class ReplEngine
             if (cancellationToken.IsCancellationRequested)
                 break;
 
-            if (string.IsNullOrWhiteSpace(input))
-                continue;
-
-            if (input.StartsWith(':'))
-            {
-                var command = _commandRegistry.FindCommand(input);
-                if (command != null)
-                {
-                    var args = ParseCommandArgs(input);
-                    var result = await command.ExecuteAsync(args, cancellationToken);
-                    
-                    if (!string.IsNullOrWhiteSpace(result.Message))
-                    {
-                        if (result.Success)
-                            WriteInfo(result.Message);
-                        else
-                            WriteError(result.Message);
-                    }
-                    
-                    if (result.ShouldExit)
-                        break;
-                }
-                else
-                {
-                    _logger.LogWarning("User entered unknown command: {Command}", input);
-                    WriteError($"Unknown command: {input}");
-                }
-            }
-            else
-            {
-                _logger.LogWarning("User entered non-command input: {Input}", input);
-                WriteError("Commands must start with ':'. Type :help for available commands.");
-            }
+            await ProcessInputAsync(input, cancellationToken).ConfigureAwait(false);
         }
 
         _logger.LogInformation("REPL session ended");
+    }
+
+    public async Task<bool> ProcessInputAsync(string? input, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+            return false;
+
+        if (input.StartsWith(':'))
+        {
+            var command = _commandRegistry.FindCommand(input);
+            if (command != null)
+            {
+                var args = ParseCommandArgs(input);
+                var result = await command.ExecuteAsync(args, cancellationToken);
+
+                if (!string.IsNullOrWhiteSpace(result.Message))
+                {
+                    if (result.Success)
+                        WriteInfo(result.Message);
+                    else
+                        WriteError(result.Message);
+                }
+
+                return result.ShouldExit;
+            }
+            else
+            {
+                _logger.LogWarning("User entered unknown command: {Command}", input);
+                WriteError($"Unknown command: {input}");
+                return false;
+            }
+        }
+        else
+        {
+            _logger.LogWarning("User entered non-command input: {Input}", input);
+            WriteError("Commands must start with ':'. Type :help for available commands.");
+            return false;
+        }
     }
 
     private static string[] ParseCommandArgs(string input)
@@ -84,27 +90,27 @@ public class ReplEngine
         var parts = input.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         return parts.Length > 1 ? parts[1..] : Array.Empty<string>();
     }
-    private void WritePrompt(string message)
+    public void WritePrompt(string message)
     {
         WriteColored(message, _theme.PromptColor);
     }
 
-    private void WriteStatus(string message)
+    public void WriteStatus(string message)
     {
         WriteColored(message, _theme.StatusMessageColor);
     }
 
-    private void WriteInfo(string message)
+    public void WriteInfo(string message)
     {
         Console.WriteLine(message);
     }
 
-    private void WriteError(string message)
+    public void WriteError(string message)
     {
         WriteColored(message, nameof(ConsoleColor.Red));
     }
 
-    private void WriteColored(string message, string colorName)
+    public void WriteColored(string message, string colorName)
     {
         if (Enum.TryParse<ConsoleColor>(colorName, true, out var color))
         {
