@@ -169,4 +169,124 @@ public class BlobTests
 
         Assert.Equal(blob1.GetHashCode(), blob2.GetHashCode());
     }
+
+    [Fact]
+    public void Equals_WithSamePathAndBothNullETags_ShouldReturnTrue()
+    {
+        var blob1 = new Blob
+        {
+            Name = "test1.txt",
+            Path = "/path/test.txt",
+            ContainerName = "container",
+            BlobType = BlobType.BlockBlob,
+            ETag = null
+        };
+
+        var blob2 = new Blob
+        {
+            Name = "test2.txt",
+            Path = "/path/test.txt",
+            ContainerName = "container",
+            BlobType = BlobType.BlockBlob,
+            ETag = null
+        };
+
+        Assert.Equal(blob1, blob2);
+    }
+
+    [Fact]
+    public void Equals_WithSamePathButOneNullETag_ShouldReturnFalse()
+    {
+        var blob1 = new Blob
+        {
+            Name = "test.txt",
+            Path = "/path/test.txt",
+            ContainerName = "container",
+            BlobType = BlobType.BlockBlob,
+            ETag = "etag123"
+        };
+
+        var blob2 = new Blob
+        {
+            Name = "test.txt",
+            Path = "/path/test.txt",
+            ContainerName = "container",
+            BlobType = BlobType.BlockBlob,
+            ETag = null
+        };
+
+        Assert.NotEqual(blob1, blob2);
+    }
+
+    [Fact]
+    public void Equals_WithCaseInsensitivePath_ShouldReturnTrue()
+    {
+        var blob1 = new Blob
+        {
+            Name = "test.txt",
+            Path = "/PATH/Test.txt",
+            ContainerName = "container",
+            BlobType = BlobType.BlockBlob,
+            ETag = "etag123"
+        };
+
+        var blob2 = new Blob
+        {
+            Name = "test.txt",
+            Path = "/path/test.txt",
+            ContainerName = "container",
+            BlobType = BlobType.BlockBlob,
+            ETag = "etag123"
+        };
+
+        Assert.Equal(blob1, blob2);
+    }
+
+    [Fact]
+    public void GetHashCode_WithBothNullETags_ShouldReturnSameValue()
+    {
+        var blob1 = new Blob
+        {
+            Name = "test1.txt",
+            Path = "/PATH/test.txt",
+            ContainerName = "container",
+            BlobType = BlobType.BlockBlob,
+            ETag = null
+        };
+
+        var blob2 = new Blob
+        {
+            Name = "test2.txt",
+            Path = "/path/test.txt", // Case difference should still match
+            ContainerName = "container",
+            BlobType = BlobType.BlockBlob,
+            ETag = null
+        };
+
+        Assert.Equal(blob1.GetHashCode(), blob2.GetHashCode());
+    }
+
+    [Fact]
+    public void GetHashCode_WithDifferentETags_ShouldReturnDifferentValues()
+    {
+        var blob1 = new Blob
+        {
+            Name = "test.txt",
+            Path = "/path/test.txt",
+            ContainerName = "container",
+            BlobType = BlobType.BlockBlob,
+            ETag = "etag123"
+        };
+
+        var blob2 = new Blob
+        {
+            Name = "test.txt",
+            Path = "/path/test.txt",
+            ContainerName = "container",
+            BlobType = BlobType.BlockBlob,
+            ETag = "etag456"
+        };
+
+        Assert.NotEqual(blob1.GetHashCode(), blob2.GetHashCode());
+    }
 }

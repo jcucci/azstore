@@ -136,6 +136,138 @@ public class ContainerTests
         Assert.NotEqual(container1, container2);
     }
 
+    [Fact]
+    public void GetHashCode_WithSamePathAndETag_ShouldReturnSameValue()
+    {
+        var container1 = new Container
+        {
+            Name = "container1",
+            Path = "/PATH/container", // Case difference
+            AccessLevel = ContainerAccessLevel.None,
+            ETag = "etag123"
+        };
+
+        var container2 = new Container
+        {
+            Name = "container2",
+            Path = "/path/container", // Case difference
+            AccessLevel = ContainerAccessLevel.Blob,
+            ETag = "etag123"
+        };
+
+        Assert.Equal(container1.GetHashCode(), container2.GetHashCode());
+    }
+
+    [Fact]
+    public void Equals_WithSamePathAndBothNullETags_ShouldReturnTrue()
+    {
+        var container1 = new Container
+        {
+            Name = "container1",
+            Path = "/path/container",
+            AccessLevel = ContainerAccessLevel.None,
+            ETag = null
+        };
+
+        var container2 = new Container
+        {
+            Name = "container2",
+            Path = "/path/container",
+            AccessLevel = ContainerAccessLevel.Blob,
+            ETag = null
+        };
+
+        Assert.Equal(container1, container2);
+    }
+
+    [Fact]
+    public void Equals_WithSamePathButOneNullETag_ShouldReturnFalse()
+    {
+        var container1 = new Container
+        {
+            Name = "container",
+            Path = "/path/container",
+            AccessLevel = ContainerAccessLevel.None,
+            ETag = "etag123"
+        };
+
+        var container2 = new Container
+        {
+            Name = "container",
+            Path = "/path/container",
+            AccessLevel = ContainerAccessLevel.None,
+            ETag = null
+        };
+
+        Assert.NotEqual(container1, container2);
+    }
+
+    [Fact]
+    public void Equals_WithCaseInsensitivePath_ShouldReturnTrue()
+    {
+        var container1 = new Container
+        {
+            Name = "container",
+            Path = "/PATH/Container",
+            AccessLevel = ContainerAccessLevel.None,
+            ETag = "etag123"
+        };
+
+        var container2 = new Container
+        {
+            Name = "container",
+            Path = "/path/container",
+            AccessLevel = ContainerAccessLevel.None,
+            ETag = "etag123"
+        };
+
+        Assert.Equal(container1, container2);
+    }
+
+    [Fact]
+    public void GetHashCode_WithBothNullETags_ShouldReturnSameValue()
+    {
+        var container1 = new Container
+        {
+            Name = "container1",
+            Path = "/PATH/container",
+            AccessLevel = ContainerAccessLevel.None,
+            ETag = null
+        };
+
+        var container2 = new Container
+        {
+            Name = "container2",
+            Path = "/path/container", // Case difference should still match
+            AccessLevel = ContainerAccessLevel.Blob,
+            ETag = null
+        };
+
+        Assert.Equal(container1.GetHashCode(), container2.GetHashCode());
+    }
+
+    [Fact]
+    public void GetHashCode_WithDifferentETags_ShouldReturnDifferentValues()
+    {
+        var container1 = new Container
+        {
+            Name = "container",
+            Path = "/path/container",
+            AccessLevel = ContainerAccessLevel.None,
+            ETag = "etag123"
+        };
+
+        var container2 = new Container
+        {
+            Name = "container",
+            Path = "/path/container",
+            AccessLevel = ContainerAccessLevel.None,
+            ETag = "etag456"
+        };
+
+        Assert.NotEqual(container1.GetHashCode(), container2.GetHashCode());
+    }
+
     [Theory]
     [InlineData(ContainerAccessLevel.None)]
     [InlineData(ContainerAccessLevel.Blob)]

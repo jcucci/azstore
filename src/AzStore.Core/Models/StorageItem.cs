@@ -58,7 +58,7 @@ public abstract class StorageItem
         if (obj is StorageItem other)
         {
             return Path.Equals(other.Path, StringComparison.OrdinalIgnoreCase) &&
-                   ETag?.Equals(other.ETag, StringComparison.Ordinal) == true;
+                   string.Equals(ETag, other.ETag, StringComparison.Ordinal);
         }
         return false;
     }
@@ -69,6 +69,8 @@ public abstract class StorageItem
     /// <returns>A hash code for the current storage item.</returns>
     public override int GetHashCode()
     {
-        return HashCode.Combine(Path.ToLowerInvariant(), ETag);
+        return HashCode.Combine(
+            Path.GetHashCode(StringComparison.OrdinalIgnoreCase), 
+            ETag?.GetHashCode(StringComparison.Ordinal) ?? 0);
     }
 }
