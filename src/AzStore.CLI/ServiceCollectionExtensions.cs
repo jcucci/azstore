@@ -16,6 +16,7 @@ public static class ServiceCollectionExtensions
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
+        services.AddSingleton<IAuthenticationService, AuthenticationService>();
         services.AddSingleton<BlobService>();
         services.AddSingleton<IReplEngine, ReplEngine>();
 
