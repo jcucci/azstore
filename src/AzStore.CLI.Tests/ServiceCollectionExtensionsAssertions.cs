@@ -11,7 +11,7 @@ public static class ServiceCollectionExtensionsAssertions
     {
         var serviceProvider = services.BuildServiceProvider();
 
-        Assert.NotNull(serviceProvider.GetService<AzureStorageService>());
+        Assert.NotNull(serviceProvider.GetService<IStorageService>());
         Assert.NotNull(serviceProvider.GetService<IReplEngine>());
     }
 }

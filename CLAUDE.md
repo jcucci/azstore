@@ -94,6 +94,9 @@ public class MyCommand : ICommand
 - **Error Handling**: Comprehensive exception handling with graceful degradation
 - **Cross-Platform**: Platform-specific path handling for Windows/macOS/Linux
 - **Modern C# Features**: Use C# 12 collection expressions `[]` instead of `new[]` for arrays and simple collections
+- **Threading**: Use `System.Threading.Lock` instead of `object` for synchronization in .NET 9 for 25% performance improvement
+- **Parameter Validation**: Rely on nullable reference types and compiler safety instead of manual guards - let Azure SDK handle parameter validation with meaningful error messages
+- **Comments**: Only include inline comments when they explain non-obvious logic; remove comments that merely restate what code obviously does
 - **Testing**: Use standard xUnit assertions (not FluentAssertions), avoid collection expression ambiguity in `Assert.Equal()`
 
 ### VS Code Integration

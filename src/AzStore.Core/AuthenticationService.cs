@@ -6,6 +6,7 @@ using Azure.ResourceManager.Storage;
 using AzStore.Core.Models;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using System.Threading;
 
 namespace AzStore.Core;
 
@@ -15,7 +16,7 @@ namespace AzStore.Core;
 public class AuthenticationService : IAuthenticationService
 {
     private readonly ILogger<AuthenticationService> _logger;
-    private readonly object _lock = new();
+    private readonly Lock _lock = new();
     private DefaultAzureCredential? _credential;
     private AuthenticationResult? _cachedResult;
     private ArmClient? _armClient;
@@ -42,7 +43,6 @@ public class AuthenticationService : IAuthenticationService
             var credential = GetCredential();
             var armClient = GetArmClient(credential);
 
-            // Test the authentication by getting the default subscription
             var subscription = await armClient.GetDefaultSubscriptionAsync(cancellationToken);
             await subscription.GetAsync(cancellationToken);
 
@@ -101,7 +101,6 @@ public class AuthenticationService : IAuthenticationService
             var credential = GetCredential();
             var armClient = GetArmClient(credential);
 
-            // Get the specific subscription
             var resourceIdentifier = new ResourceIdentifier($"/subscriptions/{subscriptionId}");
             var subscription = armClient.GetSubscriptionResource(resourceIdentifier);
             await subscription.GetAsync(cancellationToken);
@@ -157,7 +156,6 @@ public class AuthenticationService : IAuthenticationService
 
         try
         {
-            // Check if we have a cached result that's still valid
             lock (_lock)
             {
                 if (_cachedResult?.Success == true &&
@@ -169,7 +167,6 @@ public class AuthenticationService : IAuthenticationService
                 }
             }
 
-            // Test authentication by attempting to get the default subscription
             var credential = GetCredential();
             var armClient = GetArmClient(credential);
             var subscription = await armClient.GetDefaultSubscriptionAsync(cancellationToken);
@@ -190,7 +187,6 @@ public class AuthenticationService : IAuthenticationService
     {
         _logger.LogDebug("Getting current authentication information");
 
-        // Check cached result first
         lock (_lock)
         {
             if (_cachedResult?.Success == true &&
@@ -202,7 +198,6 @@ public class AuthenticationService : IAuthenticationService
             }
         }
 
-        // If no valid cached result, try to authenticate
         var isAuthenticated = await IsAuthenticatedAsync(cancellationToken);
         if (!isAuthenticated)
         {

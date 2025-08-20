@@ -2,6 +2,7 @@ using Azure.Storage.Blobs;
 using AzStore.Core.Models;
 using Microsoft.Extensions.Logging;
 using System.Runtime.CompilerServices;
+using System.Threading;
 
 namespace AzStore.Core;
 
@@ -12,7 +13,7 @@ public class AzureStorageService : IStorageService
 {
     private readonly ILogger<AzureStorageService> _logger;
     private readonly IAuthenticationService _authenticationService;
-    private readonly object _lock = new();
+    private readonly Lock _lock = new();
     private BlobServiceClient? _blobServiceClient;
     private string? _currentStorageAccountName;
     private bool _isConnected;
@@ -36,16 +37,10 @@ public class AzureStorageService : IStorageService
     /// <returns>True if connection succeeded, false otherwise.</returns>
     public async Task<bool> ConnectToStorageAccountAsync(string accountName, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(accountName))
-        {
-            throw new ArgumentException("Storage account name cannot be null or empty", nameof(accountName));
-        }
-
         _logger.LogDebug("Connecting to storage account: {AccountName}", accountName);
 
         try
         {
-            // Get authentication credential from authentication service
             var authResult = await _authenticationService.GetCurrentAuthenticationAsync(cancellationToken);
             if (authResult == null || !authResult.Success)
             {
@@ -53,21 +48,17 @@ public class AzureStorageService : IStorageService
                 return false;
             }
 
-            // Build storage account URI
             var storageUri = new Uri($"https://{accountName}.blob.core.windows.net");
-            
-            // Get credential from authentication service
+
             var credential = _authenticationService.GetCredential();
             if (credential == null)
             {
                 _logger.LogWarning("Cannot connect to storage account: no valid credential available");
                 return false;
             }
-            
-            // Create BlobServiceClient
+
             var blobServiceClient = new BlobServiceClient(storageUri, credential);
 
-            // Validate access by attempting to get account info
             await blobServiceClient.GetAccountInfoAsync(cancellationToken);
 
             lock (_lock)
@@ -83,14 +74,14 @@ public class AzureStorageService : IStorageService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to connect to storage account: {AccountName}", accountName);
-            
+
             lock (_lock)
             {
                 _blobServiceClient = null;
                 _currentStorageAccountName = null;
                 _isConnected = false;
             }
-            
+
             return false;
         }
     }
@@ -121,12 +112,12 @@ public class AzureStorageService : IStorageService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Storage account validation failed");
-            
+
             lock (_lock)
             {
                 _isConnected = false;
             }
-            
+
             return false;
         }
     }
@@ -164,12 +155,12 @@ public class AzureStorageService : IStorageService
                 Path = containerItem.Name,
                 LastModified = containerItem.Properties.LastModified,
                 ETag = containerItem.Properties.ETag.ToString(),
-                Metadata = containerItem.Properties.Metadata?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value) ?? new Dictionary<string, string>(),
-                AccessLevel = ContainerAccessLevel.None, // We'd need to check the actual access level from properties
+                Metadata = containerItem.Properties.Metadata?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value) ?? [],
+                AccessLevel = ContainerAccessLevel.None, // TODO: Implement actual access level detection
                 HasImmutabilityPolicy = containerItem.Properties.HasImmutabilityPolicy ?? false,
                 HasLegalHold = containerItem.Properties.HasLegalHold ?? false
             };
-            
+
             yield return container;
         }
 
@@ -179,11 +170,6 @@ public class AzureStorageService : IStorageService
     /// <inheritdoc/>
     public async IAsyncEnumerable<Blob> ListBlobsAsync(string containerName, string? prefix = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(containerName))
-        {
-            throw new ArgumentException("Container name cannot be null or empty", nameof(containerName));
-        }
-
         lock (_lock)
         {
             if (!_isConnected || _blobServiceClient == null)
@@ -195,7 +181,7 @@ public class AzureStorageService : IStorageService
         _logger.LogDebug("Listing blobs in container: {ContainerName} with prefix: {Prefix}", containerName, prefix ?? "(none)");
 
         var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
-        
+
         await foreach (var blobItem in containerClient.GetBlobsAsync(prefix: prefix, cancellationToken: cancellationToken))
         {
             var blob = new Blob
@@ -203,13 +189,13 @@ public class AzureStorageService : IStorageService
                 Name = blobItem.Name,
                 Path = blobItem.Name,
                 ContainerName = containerName,
-                BlobType = BlobType.BlockBlob, // Default, we'd need to check the actual type
+                BlobType = BlobType.BlockBlob, // TODO: Detect actual blob type
                 Size = blobItem.Properties.ContentLength,
                 LastModified = blobItem.Properties.LastModified,
                 ETag = blobItem.Properties.ETag?.ToString(),
                 ContentType = blobItem.Properties.ContentType,
                 ContentHash = blobItem.Properties.ContentHash != null ? Convert.ToBase64String(blobItem.Properties.ContentHash) : null,
-                Metadata = blobItem.Metadata?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value) ?? new Dictionary<string, string>(),
+                Metadata = blobItem.Metadata?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value) ?? [],
                 AccessTier = blobItem.Properties.AccessTier?.ToString() switch
                 {
                     "Hot" => BlobAccessTier.Hot,
@@ -218,7 +204,7 @@ public class AzureStorageService : IStorageService
                     _ => BlobAccessTier.Unknown
                 }
             };
-            
+
             yield return blob;
         }
 
@@ -228,16 +214,6 @@ public class AzureStorageService : IStorageService
     /// <inheritdoc/>
     public async Task<Blob?> GetBlobAsync(string containerName, string blobName, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(containerName))
-        {
-            throw new ArgumentException("Container name cannot be null or empty", nameof(containerName));
-        }
-
-        if (string.IsNullOrWhiteSpace(blobName))
-        {
-            throw new ArgumentException("Blob name cannot be null or empty", nameof(blobName));
-        }
-
         lock (_lock)
         {
             if (!_isConnected || _blobServiceClient == null)
@@ -253,7 +229,6 @@ public class AzureStorageService : IStorageService
             var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
             var blobClient = containerClient.GetBlobClient(blobName);
 
-            // Check if blob exists
             var exists = await blobClient.ExistsAsync(cancellationToken);
             if (!exists.Value)
             {
@@ -261,7 +236,6 @@ public class AzureStorageService : IStorageService
                 return null;
             }
 
-            // Get blob properties
             var properties = await blobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
 
             var blob = new Blob
@@ -269,13 +243,13 @@ public class AzureStorageService : IStorageService
                 Name = blobName,
                 Path = blobName,
                 ContainerName = containerName,
-                BlobType = BlobType.BlockBlob, // Default, we'd need to check the actual type
+                BlobType = BlobType.BlockBlob, // TODO: Detect actual blob type
                 Size = properties.Value.ContentLength,
                 LastModified = properties.Value.LastModified,
                 ETag = properties.Value.ETag.ToString(),
                 ContentType = properties.Value.ContentType,
                 ContentHash = properties.Value.ContentHash != null ? Convert.ToBase64String(properties.Value.ContentHash) : null,
-                Metadata = properties.Value.Metadata?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value) ?? new Dictionary<string, string>(),
+                Metadata = properties.Value.Metadata?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value) ?? [],
                 AccessTier = properties.Value.AccessTier?.ToString() switch
                 {
                     "Hot" => BlobAccessTier.Hot,
@@ -298,21 +272,6 @@ public class AzureStorageService : IStorageService
     /// <inheritdoc/>
     public async Task<long> DownloadBlobAsync(string containerName, string blobName, string localFilePath, bool overwrite = false, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(containerName))
-        {
-            throw new ArgumentException("Container name cannot be null or empty", nameof(containerName));
-        }
-
-        if (string.IsNullOrWhiteSpace(blobName))
-        {
-            throw new ArgumentException("Blob name cannot be null or empty", nameof(blobName));
-        }
-
-        if (string.IsNullOrWhiteSpace(localFilePath))
-        {
-            throw new ArgumentException("Local file path cannot be null or empty", nameof(localFilePath));
-        }
-
         lock (_lock)
         {
             if (!_isConnected || _blobServiceClient == null)
@@ -328,20 +287,17 @@ public class AzureStorageService : IStorageService
             var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
             var blobClient = containerClient.GetBlobClient(blobName);
 
-            // Check if blob exists
             var exists = await blobClient.ExistsAsync(cancellationToken);
             if (!exists.Value)
             {
                 throw new InvalidOperationException($"Blob '{blobName}' does not exist in container '{containerName}'");
             }
 
-            // Check if local file exists and handle overwrite
             if (File.Exists(localFilePath) && !overwrite)
             {
                 throw new IOException($"File '{localFilePath}' already exists and overwrite is disabled");
             }
 
-            // Ensure directory exists
             var directory = Path.GetDirectoryName(localFilePath);
             if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
             {
@@ -349,12 +305,11 @@ public class AzureStorageService : IStorageService
                 _logger.LogDebug("Created directory: {Directory}", directory);
             }
 
-            // Download the blob
             var downloadResponse = await blobClient.DownloadToAsync(localFilePath, cancellationToken);
             var fileInfo = new FileInfo(localFilePath);
             var bytesDownloaded = fileInfo.Length;
 
-            _logger.LogInformation("Successfully downloaded blob: {BlobName} ({BytesDownloaded} bytes) to: {LocalFilePath}", 
+            _logger.LogInformation("Successfully downloaded blob: {BlobName} ({BytesDownloaded} bytes) to: {LocalFilePath}",
                 blobName, bytesDownloaded, localFilePath);
 
             return bytesDownloaded;
@@ -369,16 +324,6 @@ public class AzureStorageService : IStorageService
     /// <inheritdoc/>
     public async IAsyncEnumerable<DownloadResult> DownloadBlobsAsync(string containerName, string localDirectoryPath, string? prefix = null, bool overwrite = false, IProgress<DownloadProgress>? progress = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(containerName))
-        {
-            throw new ArgumentException("Container name cannot be null or empty", nameof(containerName));
-        }
-
-        if (string.IsNullOrWhiteSpace(localDirectoryPath))
-        {
-            throw new ArgumentException("Local directory path cannot be null or empty", nameof(localDirectoryPath));
-        }
-
         lock (_lock)
         {
             if (!_isConnected || _blobServiceClient == null)
@@ -387,10 +332,9 @@ public class AzureStorageService : IStorageService
             }
         }
 
-        _logger.LogDebug("Downloading blobs from container: {ContainerName} with prefix: {Prefix} to directory: {LocalDirectoryPath}", 
+        _logger.LogDebug("Downloading blobs from container: {ContainerName} with prefix: {Prefix} to directory: {LocalDirectoryPath}",
             containerName, prefix ?? "(none)", localDirectoryPath);
 
-        // Ensure local directory exists
         if (!Directory.Exists(localDirectoryPath))
         {
             Directory.CreateDirectory(localDirectoryPath);
@@ -407,7 +351,7 @@ public class AzureStorageService : IStorageService
             DownloadResult result;
             try
             {
-                // Build local file path maintaining blob hierarchy
+                // Maintain blob hierarchy in local file path
                 var relativePath = blob.Name;
                 if (!string.IsNullOrEmpty(prefix) && blob.Name.StartsWith(prefix))
                 {
@@ -415,8 +359,7 @@ public class AzureStorageService : IStorageService
                 }
 
                 var localFilePath = Path.Combine(localDirectoryPath, relativePath.Replace('/', Path.DirectorySeparatorChar));
-                
-                // Skip if file exists and overwrite is disabled
+
                 if (File.Exists(localFilePath) && !overwrite)
                 {
                     _logger.LogDebug("Skipping existing file: {LocalFilePath}", localFilePath);
@@ -424,10 +367,9 @@ public class AzureStorageService : IStorageService
                 }
                 else
                 {
-                    // Download the blob
                     var bytesDownloaded = await DownloadBlobAsync(containerName, blob.Name, localFilePath, overwrite, cancellationToken);
                     totalBytesDownloaded += bytesDownloaded;
-                    
+
                     result = new DownloadResult(blob.Name, localFilePath, bytesDownloaded, true);
                     _logger.LogDebug("Downloaded blob: {BlobName} ({BytesDownloaded} bytes)", blob.Name, bytesDownloaded);
                 }
@@ -440,12 +382,13 @@ public class AzureStorageService : IStorageService
             }
 
             completedBlobs++;
-            progress?.Report(new DownloadProgress(0, completedBlobs, blob.Name, 1.0, totalBytesDownloaded)); // We can't know totals with streaming
+            // Cannot determine total count with streaming enumeration
+            progress?.Report(new DownloadProgress(0, completedBlobs, blob.Name, 1.0, totalBytesDownloaded));
 
             yield return result;
         }
 
-        _logger.LogInformation("Batch download completed: {CompletedBlobs} blobs processed ({TotalBytesDownloaded} bytes)", 
+        _logger.LogInformation("Batch download completed: {CompletedBlobs} blobs processed ({TotalBytesDownloaded} bytes)",
             completedBlobs, totalBytesDownloaded);
     }
 
@@ -475,8 +418,8 @@ public class AzureStorageService : IStorageService
             return new StorageAccountInfo(
                 AccountName: _currentStorageAccountName,
                 AccountKind: accountInfo.Value.AccountKind.ToString(),
-                SubscriptionId: null, // TODO: Get from authentication service if needed
-                ResourceGroupName: null, // TODO: Extract from ARM if needed
+                SubscriptionId: null, // TODO: Get from authentication service
+                ResourceGroupName: null, // TODO: Extract from ARM
                 PrimaryEndpoint: _blobServiceClient.Uri
             );
         }

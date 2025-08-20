@@ -77,44 +77,4 @@ public class AzureStorageServiceTests
         Assert.Contains("not connected", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
-    public async Task ListBlobsAsync_WithInvalidContainerName_ThrowsArgumentException(string? containerName)
-    {
-        var service = AzureStorageServiceFixture.CreateWithMockDependencies();
-        
-        await Assert.ThrowsAsync<ArgumentException>(async () =>
-        {
-            await foreach (var blob in service.ListBlobsAsync(containerName!))
-            {
-                // Should throw before yielding any items
-            }
-        });
-    }
-
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
-    public async Task GetBlobAsync_WithInvalidContainerName_ThrowsArgumentException(string? containerName)
-    {
-        var service = AzureStorageServiceFixture.CreateWithMockDependencies();
-        
-        await Assert.ThrowsAsync<ArgumentException>(() =>
-            service.GetBlobAsync(containerName!, "test-blob"));
-    }
-
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
-    public async Task GetBlobAsync_WithInvalidBlobName_ThrowsArgumentException(string? blobName)
-    {
-        var service = AzureStorageServiceFixture.CreateWithMockDependencies();
-        
-        await Assert.ThrowsAsync<ArgumentException>(() =>
-            service.GetBlobAsync("test-container", blobName!));
-    }
 }
