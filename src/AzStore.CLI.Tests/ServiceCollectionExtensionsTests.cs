@@ -3,6 +3,7 @@ using Xunit;
 
 namespace AzStore.CLI.Tests;
 
+[Trait("Category", "Unit")]
 public class ServiceCollectionExtensionsTests
 {
     [Fact]

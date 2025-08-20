@@ -2,6 +2,7 @@ using Xunit;
 
 namespace AzStore.Configuration.Tests;
 
+[Trait("Category", "Unit")]
 public class AzStoreSettingsTests
 {
     [Fact]
