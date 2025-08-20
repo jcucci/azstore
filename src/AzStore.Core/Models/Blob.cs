@@ -166,6 +166,11 @@ public enum BlobType
 public enum BlobAccessTier
 {
     /// <summary>
+    /// Unknown or unspecified access tier.
+    /// </summary>
+    Unknown,
+
+    /// <summary>
     /// Hot tier - optimized for frequent access of objects.
     /// </summary>
     Hot,

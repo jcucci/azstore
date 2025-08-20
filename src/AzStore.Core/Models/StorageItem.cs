@@ -22,7 +22,7 @@ public abstract class StorageItem
     /// <summary>
     /// Gets the date and time when the storage item was last modified.
     /// </summary>
-    public DateTime? LastModified { get; init; }
+    public DateTimeOffset? LastModified { get; init; }
 
     /// <summary>
     /// Gets the size of the storage item in bytes, if applicable.

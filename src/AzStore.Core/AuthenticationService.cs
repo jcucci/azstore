@@ -6,6 +6,7 @@ using Azure.ResourceManager.Storage;
 using AzStore.Core.Models;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using System.Threading;
 
 namespace AzStore.Core;
 
@@ -15,7 +16,7 @@ namespace AzStore.Core;
 public class AuthenticationService : IAuthenticationService
 {
     private readonly ILogger<AuthenticationService> _logger;
-    private readonly object _lock = new();
+    private readonly Lock _lock = new();
     private DefaultAzureCredential? _credential;
     private AuthenticationResult? _cachedResult;
     private ArmClient? _armClient;
@@ -38,11 +39,10 @@ public class AuthenticationService : IAuthenticationService
         try
         {
             await EnsureAzureCliAvailableAsync(cancellationToken);
-            
+
             var credential = GetCredential();
             var armClient = GetArmClient(credential);
 
-            // Test the authentication by getting the default subscription
             var subscription = await armClient.GetDefaultSubscriptionAsync(cancellationToken);
             await subscription.GetAsync(cancellationToken);
 
@@ -97,11 +97,10 @@ public class AuthenticationService : IAuthenticationService
         try
         {
             await EnsureAzureCliAvailableAsync(cancellationToken);
-            
+
             var credential = GetCredential();
             var armClient = GetArmClient(credential);
 
-            // Get the specific subscription
             var resourceIdentifier = new ResourceIdentifier($"/subscriptions/{subscriptionId}");
             var subscription = armClient.GetSubscriptionResource(resourceIdentifier);
             await subscription.GetAsync(cancellationToken);
@@ -157,11 +156,10 @@ public class AuthenticationService : IAuthenticationService
 
         try
         {
-            // Check if we have a cached result that's still valid
             lock (_lock)
             {
-                if (_cachedResult?.Success == true && 
-                    _cachedResult.ExpiresOn.HasValue && 
+                if (_cachedResult?.Success == true &&
+                    _cachedResult.ExpiresOn.HasValue &&
                     _cachedResult.ExpiresOn.Value > DateTime.UtcNow.AddMinutes(5))
                 {
                     _logger.LogDebug("Using cached authentication result");
@@ -169,7 +167,6 @@ public class AuthenticationService : IAuthenticationService
                 }
             }
 
-            // Test authentication by attempting to get the default subscription
             var credential = GetCredential();
             var armClient = GetArmClient(credential);
             var subscription = await armClient.GetDefaultSubscriptionAsync(cancellationToken);
@@ -190,11 +187,10 @@ public class AuthenticationService : IAuthenticationService
     {
         _logger.LogDebug("Getting current authentication information");
 
-        // Check cached result first
         lock (_lock)
         {
-            if (_cachedResult?.Success == true && 
-                _cachedResult.ExpiresOn.HasValue && 
+            if (_cachedResult?.Success == true &&
+                _cachedResult.ExpiresOn.HasValue &&
                 _cachedResult.ExpiresOn.Value > DateTime.UtcNow.AddMinutes(5))
             {
                 _logger.LogDebug("Returning cached authentication result");
@@ -202,7 +198,6 @@ public class AuthenticationService : IAuthenticationService
             }
         }
 
-        // If no valid cached result, try to authenticate
         var isAuthenticated = await IsAuthenticatedAsync(cancellationToken);
         if (!isAuthenticated)
         {
@@ -225,12 +220,12 @@ public class AuthenticationService : IAuthenticationService
             var armClient = GetArmClient(credential);
 
             var subscriptions = new List<AzureSubscription>();
-            
+
             await foreach (var subscription in armClient.GetSubscriptions().GetAllAsync(cancellationToken))
             {
                 var subscriptionId = subscription.Id.SubscriptionId != null ? Guid.Parse(subscription.Id.SubscriptionId) : Guid.Empty;
                 var tenantId = subscription.Data.TenantId?.ToString() != null ? Guid.Parse(subscription.Data.TenantId.ToString()!) : Guid.Empty;
-                
+
                 if (subscriptionId != Guid.Empty)
                 {
                     subscriptions.Add(new AzureSubscription(
@@ -248,7 +243,7 @@ public class AuthenticationService : IAuthenticationService
             {
                 var defaultSubscription = await armClient.GetDefaultSubscriptionAsync(cancellationToken);
                 var defaultId = defaultSubscription.Id.SubscriptionId != null ? Guid.Parse(defaultSubscription.Id.SubscriptionId) : Guid.Empty;
-                
+
                 for (int i = 0; i < subscriptions.Count; i++)
                 {
                     if (subscriptions[i].Id == defaultId)
@@ -295,7 +290,7 @@ public class AuthenticationService : IAuthenticationService
 
             var resourceIdentifier = new ResourceIdentifier($"/subscriptions/{subscriptionId}");
             var subscription = armClient.GetSubscriptionResource(resourceIdentifier);
-            
+
             var storageAccounts = new List<StorageAccountInfo>();
 
             await foreach (var storageAccount in subscription.GetStorageAccountsAsync(cancellationToken))
@@ -315,9 +310,9 @@ public class AuthenticationService : IAuthenticationService
                 }
             }
 
-            _logger.LogInformation("Found {Count} storage accounts in subscription {SubscriptionId}", 
+            _logger.LogInformation("Found {Count} storage accounts in subscription {SubscriptionId}",
                 storageAccounts.Count, subscriptionId);
-            
+
             return storageAccounts;
         }
         catch (Azure.RequestFailedException ex) when (ex.Status == 404)
@@ -351,7 +346,7 @@ public class AuthenticationService : IAuthenticationService
 
         // Perform fresh authentication
         var result = await AuthenticateAsync(cancellationToken);
-        
+
         if (result.Success)
         {
             _logger.LogInformation("Authentication refreshed successfully");
@@ -404,7 +399,7 @@ public class AuthenticationService : IAuthenticationService
 
             await process.WaitForExitAsync(cancellationToken);
             var isAvailable = process.ExitCode == 0;
-            
+
             _logger.LogDebug("Azure CLI availability check: {IsAvailable}", isAvailable);
             return isAvailable;
         }
@@ -466,7 +461,8 @@ public class AuthenticationService : IAuthenticationService
     /// Gets or creates the DefaultAzureCredential configured to use only AzureCliCredential.
     /// </summary>
     /// <returns>The configured credential instance.</returns>
-    private DefaultAzureCredential GetCredential()
+    /// <inheritdoc/>
+    public TokenCredential GetCredential()
     {
         if (_credential == null)
         {
