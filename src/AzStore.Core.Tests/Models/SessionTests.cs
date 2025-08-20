@@ -3,6 +3,7 @@ using Xunit;
 
 namespace AzStore.Core.Tests.Models;
 
+[Trait("Category", "Unit")]
 public class SessionTests
 {
     [Fact]

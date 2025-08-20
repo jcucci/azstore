@@ -2,6 +2,7 @@ using Xunit;
 
 namespace AzStore.Terminal.Tests;
 
+[Trait("Category", "Unit")]
 public class ReplEngineTests
 {
     [Fact]

@@ -85,6 +85,8 @@ public class MyCommand : ICommand
 - **Mocking**: NSubstitute for dependency substitution
 - **Assertions**: Standard xUnit assertions only (no FluentAssertions)
 - **Coverage**: Comprehensive unit tests for all major components
+- **Test Categories**: Unit tests use `[Trait("Category", "Unit")]`, Integration tests use `[Trait("Category", "Integration")]`
+- **CI Filtering**: Use `--filter "Category!=Integration"` to exclude integration tests in CI builds where Azure CLI may not be available
 
 ### Code Standards
 - **Dependency Injection**: Constructor injection with ILogger<T> pattern
@@ -134,15 +136,22 @@ Complete development environment setup:
 - **Service interfaces**: IStorageService, ISessionManager, IAuthenticationService, IConfigurationService, IReplEngine, ICommandProcessor
 - **Model tests**: 53 comprehensive unit tests with xUnit assertions for all models
 
+### ✅ Authentication Phase Complete (Issue #6)
+- **Azure CLI authentication service**: Full implementation using DefaultAzureCredential with AzureCliCredential only
+- **Cross-platform support**: Works on Windows, macOS, and Linux
+- **Comprehensive error handling**: Graceful handling of Azure CLI not installed/authenticated scenarios
+- **Token management**: Automatic token refresh and caching with expiration handling
+- **Subscription management**: Enumerate available subscriptions and storage accounts
+- **Test coverage**: 28 unit tests + 8 integration tests with category traits for CI filtering
+- **Dependencies**: Azure.Identity (1.12.1), Azure.ResourceManager (1.13.0), Azure.ResourceManager.Storage (1.3.0)
+
 ### 🚧 In Development
-- Azure Blob Storage authentication implementation
 - Container and blob enumeration
 - File download functionality
 - VIM-like keyboard navigation
 - Session persistence
 
 ### 📋 Next Phase
-- Azure CLI authentication service implementation
 - Interactive blob browser with VIM navigation
 - File conflict resolution
 - Progress indication for downloads
