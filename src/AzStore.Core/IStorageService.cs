@@ -11,10 +11,10 @@ public interface IStorageService
     /// Lists all containers in the storage account.
     /// </summary>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
-    /// <returns>A collection of containers in the storage account.</returns>
+    /// <returns>An async enumerable of containers in the storage account.</returns>
     /// <exception cref="UnauthorizedAccessException">Thrown when authentication fails or access is denied.</exception>
     /// <exception cref="InvalidOperationException">Thrown when the storage service is not properly configured.</exception>
-    Task<IEnumerable<Container>> ListContainersAsync(CancellationToken cancellationToken = default);
+    IAsyncEnumerable<Container> ListContainersAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Lists blobs in the specified container, optionally filtered by prefix.
@@ -22,11 +22,11 @@ public interface IStorageService
     /// <param name="containerName">The name of the container to list blobs from.</param>
     /// <param name="prefix">Optional prefix to filter blobs (for virtual directory navigation).</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
-    /// <returns>A collection of blobs in the specified container.</returns>
+    /// <returns>An async enumerable of blobs in the specified container.</returns>
     /// <exception cref="ArgumentException">Thrown when containerName is null or empty.</exception>
     /// <exception cref="UnauthorizedAccessException">Thrown when authentication fails or access is denied.</exception>
     /// <exception cref="InvalidOperationException">Thrown when the container does not exist.</exception>
-    Task<IEnumerable<Blob>> ListBlobsAsync(string containerName, string? prefix = null, CancellationToken cancellationToken = default);
+    IAsyncEnumerable<Blob> ListBlobsAsync(string containerName, string? prefix = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Gets detailed information about a specific blob.
@@ -63,11 +63,11 @@ public interface IStorageService
     /// <param name="overwrite">Whether to overwrite local files if they already exist.</param>
     /// <param name="progress">Optional progress reporter for tracking download progress.</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
-    /// <returns>A collection of download results with blob names and local file paths.</returns>
+    /// <returns>An async enumerable of download results with blob names and local file paths.</returns>
     /// <exception cref="ArgumentException">Thrown when containerName or localDirectoryPath is null or empty.</exception>
     /// <exception cref="UnauthorizedAccessException">Thrown when authentication fails or access is denied.</exception>
     /// <exception cref="DirectoryNotFoundException">Thrown when the local directory does not exist and cannot be created.</exception>
-    Task<IEnumerable<DownloadResult>> DownloadBlobsAsync(
+    IAsyncEnumerable<DownloadResult> DownloadBlobsAsync(
         string containerName, 
         string localDirectoryPath, 
         string? prefix = null, 

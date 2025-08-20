@@ -78,10 +78,7 @@
                 "--project",
                 "${workspaceFolder}/src/AzStore.CLI/AzStore.CLI.csproj"
             ],
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            },
+            "group": "build",
             "presentation": {
                 "echo": true,
                 "reveal": "always",
@@ -176,6 +173,16 @@
                 "panel": "shared"
             },
             "problemMatcher": []
+        },
+        {
+            "type": "dotnet",
+            "task": "build",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [],
+            "label": "dotnet: build"
         }
     ]
 }

@@ -17,7 +17,7 @@ public static class ServiceCollectionExtensions
             .ValidateOnStart();
 
         services.AddSingleton<IAuthenticationService, AuthenticationService>();
-        services.AddSingleton<BlobService>();
+        services.AddSingleton<IStorageService, AzureStorageService>();
         services.AddSingleton<IReplEngine, ReplEngine>();
 
         services.AddTransient<ICommand, ExitCommand>();

@@ -1,3 +1,4 @@
+using Azure.Core;
 using AzStore.Core.Models;
 
 namespace AzStore.Core;
@@ -83,4 +84,11 @@ public interface IAuthenticationService
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>The Azure CLI version string, or null if not available.</returns>
     Task<string?> GetAzureCliVersionAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets the Azure credential for direct use with Azure SDK clients.
+    /// </summary>
+    /// <returns>The TokenCredential for authentication, or null if not authenticated.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when authentication is not available.</exception>
+    TokenCredential? GetCredential();
 }
