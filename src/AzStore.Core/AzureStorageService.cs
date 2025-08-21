@@ -1,8 +1,9 @@
 using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
 using AzStore.Core.Models;
 using Microsoft.Extensions.Logging;
-using System.Runtime.CompilerServices;
-using System.Threading;
+using AzureBlobType = Azure.Storage.Blobs.Models.BlobType;
+using AppBlobType = AzStore.Core.Models.BlobType;
 
 namespace AzStore.Core;
 
@@ -135,98 +136,169 @@ public class AzureStorageService : IStorageService
     }
 
     /// <inheritdoc/>
-    public async IAsyncEnumerable<Container> ListContainersAsync([EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public async Task<PagedResult<Container>> ListContainersAsync(PageRequest pageRequest, CancellationToken cancellationToken = default)
     {
-        lock (_lock)
+        EnsureConnected();
+
+        _logger.LogDebug("Listing containers in storage account: {AccountName} (Page size: {PageSize}, Continuation: {HasContinuation})", 
+            _currentStorageAccountName, pageRequest.PageSize, !string.IsNullOrEmpty(pageRequest.ContinuationToken));
+
+        var containers = new List<Container>();
+        var pages = _blobServiceClient!.GetBlobContainersAsync(cancellationToken: cancellationToken)
+            .AsPages(pageRequest.ContinuationToken, pageRequest.PageSize);
+
+        await foreach (var page in pages)
         {
-            if (!_isConnected || _blobServiceClient == null)
+            foreach (var containerItem in page.Values)
             {
-                throw new InvalidOperationException("Not connected to a storage account. Call ConnectToStorageAccountAsync first.");
+                var container = new Container
+                {
+                    Name = containerItem.Name,
+                    Path = containerItem.Name,
+                    LastModified = containerItem.Properties.LastModified,
+                    ETag = containerItem.Properties.ETag.ToString(),
+                    Metadata = ConvertMetadata(containerItem.Properties.Metadata),
+                    AccessLevel = await GetContainerAccessLevelAsync(containerItem.Name, cancellationToken),
+                    HasImmutabilityPolicy = containerItem.Properties.HasImmutabilityPolicy,
+                    HasLegalHold = containerItem.Properties.HasLegalHold
+                };
+
+                containers.Add(container);
             }
+
+            _logger.LogDebug("Retrieved {ContainerCount} containers, continuation token: {HasContinuation}", 
+                containers.Count, !string.IsNullOrEmpty(page.ContinuationToken));
+
+            return new PagedResult<Container>(containers, page.ContinuationToken);
         }
 
-        _logger.LogDebug("Listing containers in storage account: {AccountName}", _currentStorageAccountName);
-
-        await foreach (var containerItem in _blobServiceClient.GetBlobContainersAsync(cancellationToken: cancellationToken))
-        {
-            var container = new Container
-            {
-                Name = containerItem.Name,
-                Path = containerItem.Name,
-                LastModified = containerItem.Properties.LastModified,
-                ETag = containerItem.Properties.ETag.ToString(),
-                Metadata = containerItem.Properties.Metadata?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value) ?? [],
-                AccessLevel = ContainerAccessLevel.None, // TODO: Implement actual access level detection
-                HasImmutabilityPolicy = containerItem.Properties.HasImmutabilityPolicy ?? false,
-                HasLegalHold = containerItem.Properties.HasLegalHold ?? false
-            };
-
-            yield return container;
-        }
-
-        _logger.LogDebug("Completed listing containers");
+        _logger.LogDebug("No containers found");
+        return PagedResult<Container>.Empty();
     }
 
     /// <inheritdoc/>
-    public async IAsyncEnumerable<Blob> ListBlobsAsync(string containerName, string? prefix = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public async Task<Container?> GetContainerPropertiesAsync(string containerName, CancellationToken cancellationToken = default)
     {
-        lock (_lock)
+        _logger.LogDebug("Getting container properties: {ContainerName}", containerName);
+
+        try
         {
-            if (!_isConnected || _blobServiceClient == null)
+            var containerClient = GetContainerClient(containerName);
+
+            var exists = await containerClient.ExistsAsync(cancellationToken);
+            if (!exists.Value)
             {
-                throw new InvalidOperationException("Not connected to a storage account. Call ConnectToStorageAccountAsync first.");
+                _logger.LogDebug("Container not found: {ContainerName}", containerName);
+                return null;
             }
-        }
 
-        _logger.LogDebug("Listing blobs in container: {ContainerName} with prefix: {Prefix}", containerName, prefix ?? "(none)");
+            var properties = await containerClient.GetPropertiesAsync(cancellationToken: cancellationToken);
 
-        var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
-
-        await foreach (var blobItem in containerClient.GetBlobsAsync(prefix: prefix, cancellationToken: cancellationToken))
-        {
-            var blob = new Blob
+            var container = new Container
             {
-                Name = blobItem.Name,
-                Path = blobItem.Name,
-                ContainerName = containerName,
-                BlobType = BlobType.BlockBlob, // TODO: Detect actual blob type
-                Size = blobItem.Properties.ContentLength,
-                LastModified = blobItem.Properties.LastModified,
-                ETag = blobItem.Properties.ETag?.ToString(),
-                ContentType = blobItem.Properties.ContentType,
-                ContentHash = blobItem.Properties.ContentHash != null ? Convert.ToBase64String(blobItem.Properties.ContentHash) : null,
-                Metadata = blobItem.Metadata?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value) ?? [],
-                AccessTier = blobItem.Properties.AccessTier?.ToString() switch
-                {
-                    "Hot" => BlobAccessTier.Hot,
-                    "Cool" => BlobAccessTier.Cool,
-                    "Archive" => BlobAccessTier.Archive,
-                    _ => BlobAccessTier.Unknown
-                }
+                Name = containerName,
+                Path = containerName,
+                LastModified = properties.Value.LastModified,
+                ETag = properties.Value.ETag.ToString(),
+                Metadata = ConvertMetadata(properties.Value.Metadata),
+                AccessLevel = await GetContainerAccessLevelAsync(containerName, cancellationToken),
+                HasImmutabilityPolicy = properties.Value.HasImmutabilityPolicy,
+                HasLegalHold = properties.Value.HasLegalHold,
+                LeaseState = properties.Value.LeaseState?.ToString(),
+                LeaseStatus = properties.Value.LeaseStatus?.ToString()
             };
 
-            yield return blob;
+            _logger.LogDebug("Successfully retrieved container properties: {ContainerName}", containerName);
+            return container;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get container properties: {ContainerName}", containerName);
+            throw new InvalidOperationException($"Failed to get container properties for '{containerName}': {ex.Message}", ex);
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<bool> ValidateContainerAccessAsync(string containerName, CancellationToken cancellationToken = default)
+    {
+        EnsureConnected(); // Explicit connection check that throws for infrastructure issues
+        
+        _logger.LogDebug("Validating container access: {ContainerName}", containerName);
+
+        try
+        {
+            var containerClient = _blobServiceClient!.GetBlobContainerClient(containerName);
+            var exists = await containerClient.ExistsAsync(cancellationToken);
+            
+            if (!exists.Value)
+            {
+                _logger.LogDebug("Container does not exist: {ContainerName}", containerName);
+                return false;
+            }
+
+            await containerClient.GetPropertiesAsync(cancellationToken: cancellationToken);
+            _logger.LogDebug("Container access validated successfully: {ContainerName}", containerName);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Container access validation failed: {ContainerName}", containerName);
+            return false;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<PagedResult<Blob>> ListBlobsAsync(string containerName, string? prefix, PageRequest pageRequest, CancellationToken cancellationToken = default)
+    {
+        _logger.LogDebug("Listing blobs in container: {ContainerName} with prefix: {Prefix} (Page size: {PageSize}, Continuation: {HasContinuation})", 
+            containerName, prefix ?? "(none)", pageRequest.PageSize, !string.IsNullOrEmpty(pageRequest.ContinuationToken));
+
+        var containerClient = GetContainerClient(containerName);
+        var blobs = new List<Blob>();
+
+        var pages = containerClient.GetBlobsAsync(prefix: prefix, cancellationToken: cancellationToken)
+            .AsPages(pageRequest.ContinuationToken, pageRequest.PageSize);
+
+        await foreach (var page in pages)
+        {
+            foreach (var blobItem in page.Values)
+            {
+                var blob = new Blob
+                {
+                    Name = blobItem.Name,
+                    Path = blobItem.Name,
+                    ContainerName = containerName,
+                    BlobType = MapBlobType(blobItem.Properties.BlobType),
+                    Size = blobItem.Properties.ContentLength,
+                    LastModified = blobItem.Properties.LastModified,
+                    ETag = blobItem.Properties.ETag?.ToString(),
+                    ContentType = blobItem.Properties.ContentType,
+                    ContentHash = blobItem.Properties.ContentHash != null ? Convert.ToBase64String(blobItem.Properties.ContentHash) : null,
+                    Metadata = ConvertMetadata(blobItem.Metadata),
+                    AccessTier = MapAccessTier(blobItem.Properties.AccessTier?.ToString())
+                };
+
+                blobs.Add(blob);
+            }
+
+            _logger.LogDebug("Retrieved {BlobCount} blobs from container: {ContainerName}, continuation token: {HasContinuation}", 
+                blobs.Count, containerName, !string.IsNullOrEmpty(page.ContinuationToken));
+
+            return new PagedResult<Blob>(blobs, page.ContinuationToken);
         }
 
-        _logger.LogDebug("Completed listing blobs in container: {ContainerName}", containerName);
+        _logger.LogDebug("No blobs found in container: {ContainerName}", containerName);
+        return PagedResult<Blob>.Empty();
     }
 
     /// <inheritdoc/>
     public async Task<Blob?> GetBlobAsync(string containerName, string blobName, CancellationToken cancellationToken = default)
     {
-        lock (_lock)
-        {
-            if (!_isConnected || _blobServiceClient == null)
-            {
-                throw new InvalidOperationException("Not connected to a storage account. Call ConnectToStorageAccountAsync first.");
-            }
-        }
-
         _logger.LogDebug("Getting blob details: {BlobName} in container: {ContainerName}", blobName, containerName);
 
         try
         {
-            var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
+            var containerClient = GetContainerClient(containerName);
             var blobClient = containerClient.GetBlobClient(blobName);
 
             var exists = await blobClient.ExistsAsync(cancellationToken);
@@ -243,20 +315,14 @@ public class AzureStorageService : IStorageService
                 Name = blobName,
                 Path = blobName,
                 ContainerName = containerName,
-                BlobType = BlobType.BlockBlob, // TODO: Detect actual blob type
+                BlobType = MapBlobType(properties.Value.BlobType),
                 Size = properties.Value.ContentLength,
                 LastModified = properties.Value.LastModified,
                 ETag = properties.Value.ETag.ToString(),
                 ContentType = properties.Value.ContentType,
                 ContentHash = properties.Value.ContentHash != null ? Convert.ToBase64String(properties.Value.ContentHash) : null,
-                Metadata = properties.Value.Metadata?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value) ?? [],
-                AccessTier = properties.Value.AccessTier?.ToString() switch
-                {
-                    "Hot" => BlobAccessTier.Hot,
-                    "Cool" => BlobAccessTier.Cool,
-                    "Archive" => BlobAccessTier.Archive,
-                    _ => BlobAccessTier.Unknown
-                }
+                Metadata = ConvertMetadata(properties.Value.Metadata),
+                AccessTier = MapAccessTier(properties.Value.AccessTier?.ToString())
             };
 
             _logger.LogDebug("Successfully retrieved blob details: {BlobName}", blobName);
@@ -272,19 +338,11 @@ public class AzureStorageService : IStorageService
     /// <inheritdoc/>
     public async Task<long> DownloadBlobAsync(string containerName, string blobName, string localFilePath, bool overwrite = false, CancellationToken cancellationToken = default)
     {
-        lock (_lock)
-        {
-            if (!_isConnected || _blobServiceClient == null)
-            {
-                throw new InvalidOperationException("Not connected to a storage account. Call ConnectToStorageAccountAsync first.");
-            }
-        }
-
         _logger.LogDebug("Downloading blob: {BlobName} from container: {ContainerName} to: {LocalFilePath}", blobName, containerName, localFilePath);
 
         try
         {
-            var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
+            var containerClient = GetContainerClient(containerName);
             var blobClient = containerClient.GetBlobClient(blobName);
 
             var exists = await blobClient.ExistsAsync(cancellationToken);
@@ -321,76 +379,6 @@ public class AzureStorageService : IStorageService
         }
     }
 
-    /// <inheritdoc/>
-    public async IAsyncEnumerable<DownloadResult> DownloadBlobsAsync(string containerName, string localDirectoryPath, string? prefix = null, bool overwrite = false, IProgress<DownloadProgress>? progress = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
-    {
-        lock (_lock)
-        {
-            if (!_isConnected || _blobServiceClient == null)
-            {
-                throw new InvalidOperationException("Not connected to a storage account. Call ConnectToStorageAccountAsync first.");
-            }
-        }
-
-        _logger.LogDebug("Downloading blobs from container: {ContainerName} with prefix: {Prefix} to directory: {LocalDirectoryPath}",
-            containerName, prefix ?? "(none)", localDirectoryPath);
-
-        if (!Directory.Exists(localDirectoryPath))
-        {
-            Directory.CreateDirectory(localDirectoryPath);
-            _logger.LogDebug("Created directory: {Directory}", localDirectoryPath);
-        }
-
-        var completedBlobs = 0;
-        var totalBytesDownloaded = 0L;
-
-        await foreach (var blob in ListBlobsAsync(containerName, prefix, cancellationToken))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            DownloadResult result;
-            try
-            {
-                // Maintain blob hierarchy in local file path
-                var relativePath = blob.Name;
-                if (!string.IsNullOrEmpty(prefix) && blob.Name.StartsWith(prefix))
-                {
-                    relativePath = blob.Name[prefix.Length..].TrimStart('/');
-                }
-
-                var localFilePath = Path.Combine(localDirectoryPath, relativePath.Replace('/', Path.DirectorySeparatorChar));
-
-                if (File.Exists(localFilePath) && !overwrite)
-                {
-                    _logger.LogDebug("Skipping existing file: {LocalFilePath}", localFilePath);
-                    result = new DownloadResult(blob.Name, localFilePath, 0, false, "File already exists and overwrite is disabled");
-                }
-                else
-                {
-                    var bytesDownloaded = await DownloadBlobAsync(containerName, blob.Name, localFilePath, overwrite, cancellationToken);
-                    totalBytesDownloaded += bytesDownloaded;
-
-                    result = new DownloadResult(blob.Name, localFilePath, bytesDownloaded, true);
-                    _logger.LogDebug("Downloaded blob: {BlobName} ({BytesDownloaded} bytes)", blob.Name, bytesDownloaded);
-                }
-            }
-            catch (Exception ex)
-            {
-                var errorMessage = $"Failed to download blob '{blob.Name}': {ex.Message}";
-                _logger.LogWarning(ex, "Download failed for blob: {BlobName}", blob.Name);
-                result = new DownloadResult(blob.Name, string.Empty, 0, false, errorMessage);
-            }
-
-            completedBlobs++;
-            // Cannot determine total count with streaming enumeration
-            progress?.Report(new DownloadProgress(0, completedBlobs, blob.Name, 1.0, totalBytesDownloaded));
-
-            yield return result;
-        }
-
-        _logger.LogInformation("Batch download completed: {CompletedBlobs} blobs processed ({TotalBytesDownloaded} bytes)",
-            completedBlobs, totalBytesDownloaded);
-    }
 
     /// <inheritdoc/>
     public async Task<bool> IsAuthenticatedAsync(CancellationToken cancellationToken = default)
@@ -427,6 +415,95 @@ public class AzureStorageService : IStorageService
         {
             _logger.LogError(ex, "Failed to get storage account info");
             return null;
+        }
+    }
+
+    /// <summary>
+    /// Ensures the service is connected to a storage account, throwing an exception if not.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Thrown when not connected to a storage account.</exception>
+    private void EnsureConnected()
+    {
+        lock (_lock)
+        {
+            if (!_isConnected || _blobServiceClient == null)
+            {
+                throw new InvalidOperationException("Not connected to a storage account. Call ConnectToStorageAccountAsync first.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Converts Azure metadata dictionary to a standard dictionary, handling null values.
+    /// </summary>
+    /// <param name="metadata">The metadata dictionary to convert.</param>
+    /// <returns>A converted dictionary or empty dictionary if input is null.</returns>
+    private static Dictionary<string, string> ConvertMetadata(IDictionary<string, string>? metadata)
+        => metadata?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value) ?? [];
+
+    /// <summary>
+    /// Maps Azure SDK access tier string to the application's BlobAccessTier enum.
+    /// </summary>
+    /// <param name="accessTier">The access tier string from Azure SDK.</param>
+    /// <returns>The corresponding BlobAccessTier enum value.</returns>
+    private static BlobAccessTier MapAccessTier(string? accessTier)
+        => accessTier switch
+        {
+            "Hot" => BlobAccessTier.Hot,
+            "Cool" => BlobAccessTier.Cool,
+            "Archive" => BlobAccessTier.Archive,
+            _ => BlobAccessTier.Unknown
+        };
+
+    /// <summary>
+    /// Maps Azure SDK BlobType to the application's BlobType enum.
+    /// </summary>
+    /// <param name="azureBlobType">The Azure SDK BlobType.</param>
+    /// <returns>The corresponding application BlobType enum value.</returns>
+    private static AppBlobType MapBlobType(AzureBlobType? azureBlobType)
+        => azureBlobType switch
+        {
+            AzureBlobType.Block => AppBlobType.BlockBlob,
+            AzureBlobType.Page => AppBlobType.PageBlob,
+            AzureBlobType.Append => AppBlobType.AppendBlob,
+            _ => AppBlobType.BlockBlob // Default to BlockBlob for unknown types
+        };
+
+    /// <summary>
+    /// Gets a container client for the specified container name.
+    /// </summary>
+    /// <param name="containerName">The name of the container.</param>
+    /// <returns>A BlobContainerClient for the specified container.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when not connected to a storage account.</exception>
+    private BlobContainerClient GetContainerClient(string containerName)
+    {
+        EnsureConnected();
+        return _blobServiceClient!.GetBlobContainerClient(containerName);
+    }
+
+    /// <summary>
+    /// Gets the public access level for a container.
+    /// </summary>
+    /// <param name="containerName">The name of the container.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>The container's public access level.</returns>
+    private async Task<ContainerAccessLevel> GetContainerAccessLevelAsync(string containerName, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var containerClient = GetContainerClient(containerName);
+            var accessPolicy = await containerClient.GetAccessPolicyAsync(cancellationToken: cancellationToken);
+            return accessPolicy.Value.BlobPublicAccess switch
+            {
+                PublicAccessType.BlobContainer => ContainerAccessLevel.Container,
+                PublicAccessType.Blob => ContainerAccessLevel.Blob,
+                _ => ContainerAccessLevel.None
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Could not retrieve access policy for container: {ContainerName}", containerName);
+            return ContainerAccessLevel.None;
         }
     }
 }
