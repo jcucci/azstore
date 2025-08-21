@@ -148,11 +148,18 @@ Complete development environment setup:
 - **Test coverage**: 28 unit tests + 8 integration tests with category traits for CI filtering
 - **Dependencies**: Azure.Identity (1.12.1), Azure.ResourceManager (1.13.0), Azure.ResourceManager.Storage (1.3.0)
 
+### ✅ Paging Implementation Complete
+- **Azure Storage Paging**: Replaced `IAsyncEnumerable` methods with explicit paging using `PagedResult<T>` and `PageRequest`
+- **Azure SDK Integration**: Uses `AsPages()` method for efficient server-side pagination with continuation tokens
+- **Breaking Change**: Removed streaming enumeration in favor of explicit page-by-page access for better REPL control
+- **Memory Efficiency**: Only loads one page at a time instead of streaming all results
+- **Test Coverage**: Updated all 156+ tests to use new paged API, added comprehensive paging tests
+- **REPL-Optimized**: Perfect for interactive scenarios where users navigate through containers/blobs page by page
+
 ### 🚧 In Development
-- Container and blob enumeration
-- File download functionality
 - VIM-like keyboard navigation
 - Session persistence
+- Interactive blob browser with paging navigation
 
 ### 📋 Next Phase
 - Interactive blob browser with VIM navigation
@@ -164,7 +171,25 @@ Complete development environment setup:
 - Follows Microsoft .NET hosted services patterns with structured logging and hot-reload configuration
 - Extensible command system: implement `ICommand`, register in DI, automatic discovery via `CommandRegistry`
 - Interface-driven architecture with comprehensive DI container setup
-- **Test coverage**: 104+ tests including comprehensive model validation and edge cases
+- **Test coverage**: 156+ tests including comprehensive model validation, edge cases, and paging functionality
+
+## Lessons Learned
+
+### Azure SDK Pagination Best Practices
+- **Use AsPages() for Explicit Control**: `GetBlobsAsync().AsPages(continuationToken, pageSize)` provides better control than `IAsyncEnumerable` for interactive scenarios
+- **Single Page Processing**: When implementing pagination, process only the first page and return immediately - avoid `await foreach` loops that process all pages
+- **Continuation Token Management**: Azure SDK handles opaque continuation tokens; store and pass them between requests without modification
+- **Page Size Limits**: Azure Storage supports up to 5000 items per page; default to smaller sizes (100) for better UX in terminal applications
+
+### REPL Architecture Considerations
+- **Explicit Paging vs Streaming**: For interactive applications, explicit paging (`PagedResult<T>`) is superior to streaming (`IAsyncEnumerable<T>`)
+- **Memory Management**: Paging prevents memory issues when dealing with storage accounts containing thousands of containers/blobs
+- **User Experience**: Page-by-page navigation aligns better with VIM-like keybindings and terminal constraints
+
+### Breaking Changes Management
+- **Interface Evolution**: When replacing method signatures, update all dependent code simultaneously to maintain compilation
+- **Test Migration**: Convert streaming tests to paged tests by replacing `await foreach` with direct method calls
+- **Documentation Updates**: Keep CLAUDE.md current with architectural decisions and implementation status
 
 ## Recent Implementation (GitHub Issue #4)
 

@@ -15,12 +15,12 @@ public class Container : StorageItem
     /// <summary>
     /// Gets a value indicating whether the container has an immutability policy set.
     /// </summary>
-    public bool HasImmutabilityPolicy { get; init; }
+    public bool? HasImmutabilityPolicy { get; init; }
 
     /// <summary>
     /// Gets a value indicating whether the container has a legal hold set.
     /// </summary>
-    public bool HasLegalHold { get; init; }
+    public bool? HasLegalHold { get; init; }
 
     /// <summary>
     /// Gets the lease state of the container.
