@@ -159,8 +159,8 @@ public class AzureStorageService : IStorageService
                     ETag = containerItem.Properties.ETag.ToString(),
                     Metadata = ConvertMetadata(containerItem.Properties.Metadata),
                     AccessLevel = await GetContainerAccessLevelAsync(containerItem.Name, cancellationToken),
-                    HasImmutabilityPolicy = containerItem.Properties.HasImmutabilityPolicy ?? false,
-                    HasLegalHold = containerItem.Properties.HasLegalHold ?? false
+                    HasImmutabilityPolicy = containerItem.Properties.HasImmutabilityPolicy,
+                    HasLegalHold = containerItem.Properties.HasLegalHold
                 };
 
                 containers.Add(container);
