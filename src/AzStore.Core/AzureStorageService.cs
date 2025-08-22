@@ -2,8 +2,7 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using AzStore.Core.Models;
 using Microsoft.Extensions.Logging;
-using AzureBlobType = Azure.Storage.Blobs.Models.BlobType;
-using AppBlobType = AzStore.Core.Models.BlobType;
+using System.Text.RegularExpressions;
 
 namespace AzStore.Core;
 
@@ -14,10 +13,13 @@ public class AzureStorageService : IStorageService
 {
     private readonly ILogger<AzureStorageService> _logger;
     private readonly IAuthenticationService _authenticationService;
+
     private readonly Lock _lock = new();
     private BlobServiceClient? _blobServiceClient;
     private string? _currentStorageAccountName;
     private bool _isConnected;
+
+    private const int SearchPageSizeMultiplier = 5;
 
     /// <summary>
     /// Initializes a new instance of the AzureStorageService.
@@ -140,7 +142,7 @@ public class AzureStorageService : IStorageService
     {
         EnsureConnected();
 
-        _logger.LogDebug("Listing containers in storage account: {AccountName} (Page size: {PageSize}, Continuation: {HasContinuation})", 
+        _logger.LogDebug("Listing containers in storage account: {AccountName} (Page size: {PageSize}, Continuation: {HasContinuation})",
             _currentStorageAccountName, pageRequest.PageSize, !string.IsNullOrEmpty(pageRequest.ContinuationToken));
 
         var containers = new List<Container>();
@@ -166,7 +168,7 @@ public class AzureStorageService : IStorageService
                 containers.Add(container);
             }
 
-            _logger.LogDebug("Retrieved {ContainerCount} containers, continuation token: {HasContinuation}", 
+            _logger.LogDebug("Retrieved {ContainerCount} containers, continuation token: {HasContinuation}",
                 containers.Count, !string.IsNullOrEmpty(page.ContinuationToken));
 
             return new PagedResult<Container>(containers, page.ContinuationToken);
@@ -222,14 +224,14 @@ public class AzureStorageService : IStorageService
     public async Task<bool> ValidateContainerAccessAsync(string containerName, CancellationToken cancellationToken = default)
     {
         EnsureConnected(); // Explicit connection check that throws for infrastructure issues
-        
+
         _logger.LogDebug("Validating container access: {ContainerName}", containerName);
 
         try
         {
             var containerClient = _blobServiceClient!.GetBlobContainerClient(containerName);
             var exists = await containerClient.ExistsAsync(cancellationToken);
-            
+
             if (!exists.Value)
             {
                 _logger.LogDebug("Container does not exist: {ContainerName}", containerName);
@@ -250,7 +252,7 @@ public class AzureStorageService : IStorageService
     /// <inheritdoc/>
     public async Task<PagedResult<Blob>> ListBlobsAsync(string containerName, string? prefix, PageRequest pageRequest, CancellationToken cancellationToken = default)
     {
-        _logger.LogDebug("Listing blobs in container: {ContainerName} with prefix: {Prefix} (Page size: {PageSize}, Continuation: {HasContinuation})", 
+        _logger.LogDebug("Listing blobs in container: {ContainerName} with prefix: {Prefix} (Page size: {PageSize}, Continuation: {HasContinuation})",
             containerName, prefix ?? "(none)", pageRequest.PageSize, !string.IsNullOrEmpty(pageRequest.ContinuationToken));
 
         var containerClient = GetContainerClient(containerName);
@@ -263,25 +265,11 @@ public class AzureStorageService : IStorageService
         {
             foreach (var blobItem in page.Values)
             {
-                var blob = new Blob
-                {
-                    Name = blobItem.Name,
-                    Path = blobItem.Name,
-                    ContainerName = containerName,
-                    BlobType = MapBlobType(blobItem.Properties.BlobType),
-                    Size = blobItem.Properties.ContentLength,
-                    LastModified = blobItem.Properties.LastModified,
-                    ETag = blobItem.Properties.ETag?.ToString(),
-                    ContentType = blobItem.Properties.ContentType,
-                    ContentHash = blobItem.Properties.ContentHash != null ? Convert.ToBase64String(blobItem.Properties.ContentHash) : null,
-                    Metadata = ConvertMetadata(blobItem.Metadata),
-                    AccessTier = MapAccessTier(blobItem.Properties.AccessTier?.ToString())
-                };
-
+                var blob = Blob.FromBlobItem(blobItem, containerName);
                 blobs.Add(blob);
             }
 
-            _logger.LogDebug("Retrieved {BlobCount} blobs from container: {ContainerName}, continuation token: {HasContinuation}", 
+            _logger.LogDebug("Retrieved {BlobCount} blobs from container: {ContainerName}, continuation token: {HasContinuation}",
                 blobs.Count, containerName, !string.IsNullOrEmpty(page.ContinuationToken));
 
             return new PagedResult<Blob>(blobs, page.ContinuationToken);
@@ -310,20 +298,7 @@ public class AzureStorageService : IStorageService
 
             var properties = await blobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
 
-            var blob = new Blob
-            {
-                Name = blobName,
-                Path = blobName,
-                ContainerName = containerName,
-                BlobType = MapBlobType(properties.Value.BlobType),
-                Size = properties.Value.ContentLength,
-                LastModified = properties.Value.LastModified,
-                ETag = properties.Value.ETag.ToString(),
-                ContentType = properties.Value.ContentType,
-                ContentHash = properties.Value.ContentHash != null ? Convert.ToBase64String(properties.Value.ContentHash) : null,
-                Metadata = ConvertMetadata(properties.Value.Metadata),
-                AccessTier = MapAccessTier(properties.Value.AccessTier?.ToString())
-            };
+            var blob = Blob.FromBlobProperties(blobName, properties.Value, containerName);
 
             _logger.LogDebug("Successfully retrieved blob details: {BlobName}", blobName);
             return blob;
@@ -381,6 +356,138 @@ public class AzureStorageService : IStorageService
 
 
     /// <inheritdoc/>
+    public async Task<BrowsingResult> BrowseBlobsAsync(string containerName, string? prefix, PageRequest pageRequest, CancellationToken cancellationToken = default)
+    {
+        _logger.LogDebug("Browsing blobs hierarchically in container: {ContainerName} with prefix: {Prefix} (Page size: {PageSize})",
+            containerName, prefix ?? "(none)", pageRequest.PageSize);
+
+        var containerClient = GetContainerClient(containerName);
+        var virtualDirectories = new List<VirtualDirectory>();
+        var blobs = new List<Blob>();
+
+        var pages = containerClient.GetBlobsByHierarchyAsync(
+                delimiter: "/",
+                prefix: prefix,
+                cancellationToken: cancellationToken)
+            .AsPages(pageRequest.ContinuationToken, pageRequest.PageSize);
+
+        await foreach (var page in pages)
+        {
+            foreach (var item in page.Values)
+            {
+                if (item.IsPrefix)
+                {
+                    var virtualDir = VirtualDirectory.Create(item.Prefix, containerName);
+                    virtualDirectories.Add(virtualDir);
+                }
+                else
+                {
+                    var blob = Blob.FromBlobItem(item.Blob, containerName);
+                    blobs.Add(blob);
+                }
+            }
+
+            _logger.LogDebug("Retrieved {DirectoryCount} directories and {BlobCount} blobs from container: {ContainerName}",
+                virtualDirectories.Count, blobs.Count, containerName);
+
+            return BrowsingResult.Create(virtualDirectories, blobs, containerName, prefix, page.ContinuationToken);
+        }
+
+        _logger.LogDebug("No items found in container: {ContainerName}", containerName);
+        return BrowsingResult.Empty(containerName, prefix);
+    }
+
+    /// <inheritdoc/>
+    public async Task<PagedResult<VirtualDirectory>> ListVirtualDirectoriesAsync(string containerName, string? prefix, PageRequest pageRequest, CancellationToken cancellationToken = default)
+    {
+        _logger.LogDebug("Listing virtual directories in container: {ContainerName} with prefix: {Prefix}",
+            containerName, prefix ?? "(none)");
+
+        var containerClient = GetContainerClient(containerName);
+        var directories = new List<VirtualDirectory>();
+
+        var pages = containerClient.GetBlobsByHierarchyAsync(
+                delimiter: "/",
+                prefix: prefix,
+                cancellationToken: cancellationToken)
+            .AsPages(pageRequest.ContinuationToken, pageRequest.PageSize);
+
+        await foreach (var page in pages)
+        {
+            foreach (var item in page.Values)
+            {
+                if (item.IsPrefix)
+                {
+                    var virtualDir = VirtualDirectory.Create(item.Prefix, containerName);
+                    directories.Add(virtualDir);
+                }
+            }
+
+            _logger.LogDebug("Retrieved {DirectoryCount} virtual directories from container: {ContainerName}",
+                directories.Count, containerName);
+
+            return new PagedResult<VirtualDirectory>(directories, page.ContinuationToken);
+        }
+
+        _logger.LogDebug("No virtual directories found in container: {ContainerName}", containerName);
+        return PagedResult<VirtualDirectory>.Empty();
+    }
+
+    /// <inheritdoc/>
+    public async Task<BrowsingResult> NavigateToPathAsync(string containerName, string? path, PageRequest pageRequest, CancellationToken cancellationToken = default)
+    {
+        var normalizedPath = NormalizePath(path);
+        _logger.LogDebug("Navigating to path: {Path} in container: {ContainerName}", normalizedPath ?? "(root)", containerName);
+
+        return await BrowseBlobsAsync(containerName, normalizedPath, pageRequest, cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    public async Task<PagedResult<Blob>> SearchBlobsAsync(string containerName, string searchPattern, string? prefix, PageRequest pageRequest, CancellationToken cancellationToken = default)
+    {
+        _logger.LogDebug("Searching blobs in container: {ContainerName} with pattern: {Pattern} and prefix: {Prefix}",
+            containerName, searchPattern, prefix ?? "(none)");
+
+        var allBlobs = new List<Blob>();
+        var containerClient = GetContainerClient(containerName);
+
+        var regexPattern = "^" + Regex.Escape(searchPattern)
+            .Replace("\\*", ".*")
+            .Replace("\\?", ".") + "$";
+        var regex = new Regex(regexPattern, RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+        var pages = containerClient.GetBlobsAsync(prefix: prefix, cancellationToken: cancellationToken)
+            .AsPages(pageRequest.ContinuationToken, pageRequest.PageSize * SearchPageSizeMultiplier); // Get more items to filter
+
+        await foreach (var page in pages)
+        {
+            foreach (var blobItem in page.Values)
+            {
+                var blobName = Path.GetFileName(blobItem.Name);
+                if (regex.IsMatch(blobName))
+                {
+                    var blob = Blob.FromBlobItem(blobItem, containerName);
+                    allBlobs.Add(blob);
+
+                    if (allBlobs.Count >= pageRequest.PageSize)
+                    {
+                        break;
+                    }
+                }
+            }
+
+            if (allBlobs.Count >= pageRequest.PageSize)
+            {
+                _logger.LogDebug("Found {BlobCount} matching blobs (reached page size limit)", allBlobs.Count);
+                return new PagedResult<Blob>([.. allBlobs.Take(pageRequest.PageSize)], page.ContinuationToken);
+            }
+        }
+
+        _logger.LogDebug("Search completed. Found {BlobCount} matching blobs", allBlobs.Count);
+        return new PagedResult<Blob>(allBlobs, null);
+    }
+
+    /// <inheritdoc/>
     public async Task<bool> IsAuthenticatedAsync(CancellationToken cancellationToken = default)
     {
         var authResult = await _authenticationService.GetCurrentAuthenticationAsync(cancellationToken);
@@ -418,6 +525,21 @@ public class AzureStorageService : IStorageService
         }
     }
 
+
+    /// <summary>
+    /// Normalizes a path by ensuring it ends with "/" if not null or empty, and handles null/empty cases.
+    /// </summary>
+    /// <param name="path">The path to normalize.</param>
+    /// <returns>The normalized path or null if input was null or empty.</returns>
+    private static string? NormalizePath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return null;
+
+        var trimmed = path.Trim();
+        return trimmed.EndsWith('/') ? trimmed : trimmed + "/";
+    }
+
     /// <summary>
     /// Ensures the service is connected to a storage account, throwing an exception if not.
     /// </summary>
@@ -433,41 +555,14 @@ public class AzureStorageService : IStorageService
         }
     }
 
+
     /// <summary>
     /// Converts Azure metadata dictionary to a standard dictionary, handling null values.
     /// </summary>
     /// <param name="metadata">The metadata dictionary to convert.</param>
     /// <returns>A converted dictionary or empty dictionary if input is null.</returns>
-    private static Dictionary<string, string> ConvertMetadata(IDictionary<string, string>? metadata)
-        => metadata?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value) ?? [];
-
-    /// <summary>
-    /// Maps Azure SDK access tier string to the application's BlobAccessTier enum.
-    /// </summary>
-    /// <param name="accessTier">The access tier string from Azure SDK.</param>
-    /// <returns>The corresponding BlobAccessTier enum value.</returns>
-    private static BlobAccessTier MapAccessTier(string? accessTier)
-        => accessTier switch
-        {
-            "Hot" => BlobAccessTier.Hot,
-            "Cool" => BlobAccessTier.Cool,
-            "Archive" => BlobAccessTier.Archive,
-            _ => BlobAccessTier.Unknown
-        };
-
-    /// <summary>
-    /// Maps Azure SDK BlobType to the application's BlobType enum.
-    /// </summary>
-    /// <param name="azureBlobType">The Azure SDK BlobType.</param>
-    /// <returns>The corresponding application BlobType enum value.</returns>
-    private static AppBlobType MapBlobType(AzureBlobType? azureBlobType)
-        => azureBlobType switch
-        {
-            AzureBlobType.Block => AppBlobType.BlockBlob,
-            AzureBlobType.Page => AppBlobType.PageBlob,
-            AzureBlobType.Append => AppBlobType.AppendBlob,
-            _ => AppBlobType.BlockBlob // Default to BlockBlob for unknown types
-        };
+    private static Dictionary<string, string> ConvertMetadata(IDictionary<string, string>? metadata) =>
+        metadata?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value) ?? [];
 
     /// <summary>
     /// Gets a container client for the specified container name.

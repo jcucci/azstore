@@ -98,6 +98,8 @@ public class MyCommand : ICommand
 - **Parameter Validation**: Rely on nullable reference types and compiler safety instead of manual guards - let Azure SDK handle parameter validation with meaningful error messages
 - **Comments**: Only include inline comments when they explain non-obvious logic; remove comments that merely restate what code obviously does
 - **Testing**: Use standard xUnit assertions (not FluentAssertions), avoid collection expression ambiguity in `Assert.Equal()`
+- **File Organization**: Put each class, record, struct, enum, and interface in its own code file for better maintainability and discoverability
+- **Expression Bodies**: Use expression-bodied methods when simple and readable. For single-line expressions, use one line: `public int GetValue() => 42;`. For multi-line expressions, put the arrow at the end of the method signature line and indent the body on the next line: `public Result ComplexMethod() => expression;`
 
 ### VS Code Integration
 Complete development environment setup:
