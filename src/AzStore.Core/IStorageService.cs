@@ -75,6 +75,62 @@ public interface IStorageService
     /// <exception cref="IOException">Thrown when there is an issue with the local file system.</exception>
     Task<long> DownloadBlobAsync(string containerName, string blobName, string localFilePath, bool overwrite = false, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Lists blobs and virtual directories in the specified container using hierarchical listing.
+    /// This method provides a file system-like view of blob storage using "/" as a delimiter.
+    /// </summary>
+    /// <param name="containerName">The name of the container to browse.</param>
+    /// <param name="prefix">Optional prefix to filter results (virtual directory path).</param>
+    /// <param name="pageRequest">Page request parameters (page size and continuation token).</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A browsing result containing both virtual directories and blobs at the current level.</returns>
+    /// <exception cref="ArgumentException">Thrown when containerName is null or empty.</exception>
+    /// <exception cref="UnauthorizedAccessException">Thrown when authentication fails or access is denied.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the container does not exist.</exception>
+    Task<BrowsingResult> BrowseBlobsAsync(string containerName, string? prefix, PageRequest pageRequest, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Lists only virtual directories in the specified container at the given prefix level.
+    /// </summary>
+    /// <param name="containerName">The name of the container to list directories from.</param>
+    /// <param name="prefix">Optional prefix to filter directories (parent virtual directory path).</param>
+    /// <param name="pageRequest">Page request parameters (page size and continuation token).</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A page of virtual directories with continuation token for subsequent pages.</returns>
+    /// <exception cref="ArgumentException">Thrown when containerName is null or empty.</exception>
+    /// <exception cref="UnauthorizedAccessException">Thrown when authentication fails or access is denied.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the container does not exist.</exception>
+    Task<PagedResult<VirtualDirectory>> ListVirtualDirectoriesAsync(string containerName, string? prefix, PageRequest pageRequest, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Navigates directly to a specific path within a container and returns the browsing result.
+    /// The path is treated as a virtual directory prefix.
+    /// </summary>
+    /// <param name="containerName">The name of the container to navigate within.</param>
+    /// <param name="path">The path to navigate to (e.g., "folder1/subfolder2").</param>
+    /// <param name="pageRequest">Page request parameters (page size and continuation token).</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A browsing result for the specified path.</returns>
+    /// <exception cref="ArgumentException">Thrown when containerName is null or empty.</exception>
+    /// <exception cref="UnauthorizedAccessException">Thrown when authentication fails or access is denied.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the container does not exist.</exception>
+    Task<BrowsingResult> NavigateToPathAsync(string containerName, string? path, PageRequest pageRequest, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Searches for blobs within the specified container using pattern matching.
+    /// Supports wildcards (*) and can search within a specific prefix.
+    /// </summary>
+    /// <param name="containerName">The name of the container to search within.</param>
+    /// <param name="searchPattern">The search pattern with wildcard support (* and ?).</param>
+    /// <param name="prefix">Optional prefix to limit search scope (virtual directory path).</param>
+    /// <param name="pageRequest">Page request parameters (page size and continuation token).</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A page of blobs matching the search pattern.</returns>
+    /// <exception cref="ArgumentException">Thrown when containerName or searchPattern is null or empty.</exception>
+    /// <exception cref="UnauthorizedAccessException">Thrown when authentication fails or access is denied.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the container does not exist.</exception>
+    Task<PagedResult<Blob>> SearchBlobsAsync(string containerName, string searchPattern, string? prefix, PageRequest pageRequest, CancellationToken cancellationToken = default);
+
 
     /// <summary>
     /// Checks if the storage service is properly authenticated and can access the storage account.

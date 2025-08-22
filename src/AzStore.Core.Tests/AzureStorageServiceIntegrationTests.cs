@@ -53,4 +53,52 @@ public class AzureStorageServiceIntegrationTests
         
         Assert.Contains("not connected", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public async Task BrowseBlobsAsync_WhenNotConnected_ThrowsInvalidOperationException()
+    {
+        var service = AzureStorageServiceFixture.CreateWithMockDependencies();
+        var pageRequest = PageRequest.FirstPage();
+        
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.BrowseBlobsAsync("test-container", null, pageRequest));
+        
+        Assert.Contains("not connected", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ListVirtualDirectoriesAsync_WhenNotConnected_ThrowsInvalidOperationException()
+    {
+        var service = AzureStorageServiceFixture.CreateWithMockDependencies();
+        var pageRequest = PageRequest.FirstPage();
+        
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.ListVirtualDirectoriesAsync("test-container", null, pageRequest));
+        
+        Assert.Contains("not connected", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task NavigateToPathAsync_WhenNotConnected_ThrowsInvalidOperationException()
+    {
+        var service = AzureStorageServiceFixture.CreateWithMockDependencies();
+        var pageRequest = PageRequest.FirstPage();
+        
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.NavigateToPathAsync("test-container", "documents/", pageRequest));
+        
+        Assert.Contains("not connected", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task SearchBlobsAsync_WhenNotConnected_ThrowsInvalidOperationException()
+    {
+        var service = AzureStorageServiceFixture.CreateWithMockDependencies();
+        var pageRequest = PageRequest.FirstPage();
+        
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.SearchBlobsAsync("test-container", "*.txt", null, pageRequest));
+        
+        Assert.Contains("not connected", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
 }

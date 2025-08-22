@@ -1,4 +1,6 @@
 using System.ComponentModel.DataAnnotations;
+using Azure.Storage.Blobs.Models;
+using AzureBlobType = Azure.Storage.Blobs.Models.BlobType;
 
 namespace AzStore.Core.Models;
 
@@ -83,9 +85,8 @@ public class Blob : StorageItem
     /// <param name="blobType">The type of the blob.</param>
     /// <param name="size">The size of the blob in bytes.</param>
     /// <returns>A new Blob instance.</returns>
-    public static Blob Create(string name, string path, string containerName, BlobType blobType = BlobType.BlockBlob, long? size = null)
-    {
-        return new Blob
+    public static Blob Create(string name, string path, string containerName, BlobType blobType = BlobType.BlockBlob, long? size = null) =>
+        new()
         {
             Name = name,
             Path = path,
@@ -93,16 +94,57 @@ public class Blob : StorageItem
             BlobType = blobType,
             Size = size
         };
-    }
+
+    /// <summary>
+    /// Creates a Blob instance from an Azure SDK BlobItem.
+    /// </summary>
+    /// <param name="blobItem">The Azure SDK BlobItem.</param>
+    /// <param name="containerName">The name of the container.</param>
+    /// <returns>A new Blob instance.</returns>
+    public static Blob FromBlobItem(BlobItem blobItem, string containerName) =>
+        new()
+        {
+            Name = blobItem.Name,
+            Path = blobItem.Name,
+            ContainerName = containerName,
+            BlobType = MapBlobType(blobItem.Properties.BlobType),
+            Size = blobItem.Properties.ContentLength,
+            LastModified = blobItem.Properties.LastModified,
+            ETag = blobItem.Properties.ETag?.ToString(),
+            ContentType = blobItem.Properties.ContentType,
+            ContentHash = blobItem.Properties.ContentHash != null ? Convert.ToBase64String(blobItem.Properties.ContentHash) : null,
+            Metadata = ConvertMetadata(blobItem.Metadata),
+            AccessTier = MapAccessTier(blobItem.Properties.AccessTier?.ToString())
+        };
+
+    /// <summary>
+    /// Creates a Blob instance from Azure SDK BlobProperties.
+    /// </summary>
+    /// <param name="blobName">The name of the blob.</param>
+    /// <param name="properties">The Azure SDK BlobProperties.</param>
+    /// <param name="containerName">The name of the container.</param>
+    /// <returns>A new Blob instance.</returns>
+    public static Blob FromBlobProperties(string blobName, BlobProperties properties, string containerName) =>
+        new()
+        {
+            Name = blobName,
+            Path = blobName,
+            ContainerName = containerName,
+            BlobType = MapBlobType(properties.BlobType),
+            Size = properties.ContentLength,
+            LastModified = properties.LastModified,
+            ETag = properties.ETag.ToString(),
+            ContentType = properties.ContentType,
+            ContentHash = properties.ContentHash != null ? Convert.ToBase64String(properties.ContentHash) : null,
+            Metadata = ConvertMetadata(properties.Metadata),
+            AccessTier = MapAccessTier(properties.AccessTier?.ToString())
+        };
 
     /// <summary>
     /// Gets the file extension of the blob based on its name.
     /// </summary>
     /// <returns>The file extension including the dot, or empty string if no extension.</returns>
-    public string GetExtension()
-    {
-        return System.IO.Path.GetExtension(Name);
-    }
+    public string GetExtension() => System.IO.Path.GetExtension(Name);
 
     /// <summary>
     /// Gets a human-readable representation of the blob size.
@@ -137,51 +179,40 @@ public class Blob : StorageItem
         var tierInfo = AccessTier.HasValue ? $" [{AccessTier}]" : "";
         return $"Blob: {Name}{sizeInfo}{tierInfo}";
     }
-}
-
-/// <summary>
-/// Defines the types of blobs available in Azure Blob Storage.
-/// </summary>
-public enum BlobType
-{
-    /// <summary>
-    /// A blob comprised of blocks, optimized for streaming and storing cloud objects.
-    /// </summary>
-    BlockBlob,
 
     /// <summary>
-    /// A blob comprised of pages, optimized for random read/write operations.
+    /// Maps Azure SDK BlobType to the application's BlobType enum.
     /// </summary>
-    PageBlob,
+    /// <param name="azureBlobType">The Azure SDK BlobType.</param>
+    /// <returns>The corresponding application BlobType enum value.</returns>
+    private static BlobType MapBlobType(AzureBlobType? azureBlobType) =>
+        azureBlobType switch
+        {
+            AzureBlobType.Block => BlobType.BlockBlob,
+            AzureBlobType.Page => BlobType.PageBlob,
+            AzureBlobType.Append => BlobType.AppendBlob,
+            _ => BlobType.BlockBlob // Default to BlockBlob for unknown types
+        };
 
     /// <summary>
-    /// A blob optimized for append operations, ideal for logging scenarios.
+    /// Maps Azure SDK access tier string to the application's BlobAccessTier enum.
     /// </summary>
-    AppendBlob
-}
-
-/// <summary>
-/// Defines the access tiers available for Azure Blob Storage.
-/// </summary>
-public enum BlobAccessTier
-{
-    /// <summary>
-    /// Unknown or unspecified access tier.
-    /// </summary>
-    Unknown,
+    /// <param name="accessTier">The access tier string from Azure SDK.</param>
+    /// <returns>The corresponding BlobAccessTier enum value.</returns>
+    private static BlobAccessTier MapAccessTier(string? accessTier) =>
+        accessTier switch
+        {
+            "Hot" => BlobAccessTier.Hot,
+            "Cool" => BlobAccessTier.Cool,
+            "Archive" => BlobAccessTier.Archive,
+            _ => BlobAccessTier.Unknown
+        };
 
     /// <summary>
-    /// Hot tier - optimized for frequent access of objects.
+    /// Converts Azure metadata dictionary to a standard dictionary, handling null values.
     /// </summary>
-    Hot,
-
-    /// <summary>
-    /// Cool tier - optimized for storing data that is infrequently accessed and stored for at least 30 days.
-    /// </summary>
-    Cool,
-
-    /// <summary>
-    /// Archive tier - optimized for data that can tolerate several hours of retrieval latency and will remain in the Archive tier for at least 180 days.
-    /// </summary>
-    Archive
+    /// <param name="metadata">The metadata dictionary to convert.</param>
+    /// <returns>A converted dictionary or empty dictionary if input is null.</returns>
+    private static Dictionary<string, string> ConvertMetadata(IDictionary<string, string>? metadata)
+        => metadata?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value) ?? [];
 }
