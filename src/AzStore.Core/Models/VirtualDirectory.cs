@@ -105,7 +105,7 @@ public class VirtualDirectory : StorageItem
 
         var normalizedParent = parentPrefix.TrimEnd('/') + "/";
         return Prefix.StartsWith(normalizedParent, StringComparison.OrdinalIgnoreCase) &&
-               Prefix.Count(c => c == '/') == normalizedParent.Count(c => c == '/') + 1;
+               CountSlashes(Prefix) == CountSlashes(normalizedParent) + 1;
     }
 
     /// <summary>
@@ -116,5 +116,16 @@ public class VirtualDirectory : StorageItem
     {
         var itemInfo = ItemCount.HasValue ? $" ({ItemCount} items)" : "";
         return $"Directory: {Name}{itemInfo}";
+    }
+
+    private static int CountSlashes(string text)
+    {
+        var count = 0;
+        foreach (char c in text)
+        {
+            if (c == '/')
+                count++;
+        }
+        return count;
     }
 }

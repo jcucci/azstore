@@ -19,6 +19,8 @@ public class AzureStorageService : IStorageService
     private string? _currentStorageAccountName;
     private bool _isConnected;
 
+    private const int SearchPageSizeMultiplier = 5;
+
     /// <summary>
     /// Initializes a new instance of the AzureStorageService.
     /// </summary>
@@ -452,10 +454,10 @@ public class AzureStorageService : IStorageService
         var regexPattern = "^" + Regex.Escape(searchPattern)
             .Replace("\\*", ".*")
             .Replace("\\?", ".") + "$";
-        var regex = new Regex(regexPattern, RegexOptions.IgnoreCase);
+        var regex = new Regex(regexPattern, RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         var pages = containerClient.GetBlobsAsync(prefix: prefix, cancellationToken: cancellationToken)
-            .AsPages(pageRequest.ContinuationToken, pageRequest.PageSize * 5); // Get more items to filter
+            .AsPages(pageRequest.ContinuationToken, pageRequest.PageSize * SearchPageSizeMultiplier); // Get more items to filter
 
         await foreach (var page in pages)
         {

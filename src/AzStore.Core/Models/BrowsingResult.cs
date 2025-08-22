@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.ComponentModel.DataAnnotations;
 using System.Text.RegularExpressions;
 
@@ -20,6 +21,7 @@ public record BrowsingResult(
     string? CurrentPrefix,
     int TotalCount)
 {
+    private static readonly ConcurrentDictionary<string, Regex> RegexCache = new();
     /// <summary>
     /// Creates an empty browsing result for cases where no items are found.
     /// </summary>
@@ -112,8 +114,9 @@ public record BrowsingResult(
             .Replace("\\*", ".*")
             .Replace("\\?", ".") + "$";
 
-        var options = ignoreCase ? RegexOptions.IgnoreCase : RegexOptions.None;
-        var regex = new Regex(regexPattern, options);
+        var options = ignoreCase ? RegexOptions.IgnoreCase | RegexOptions.Compiled : RegexOptions.Compiled;
+        var cacheKey = $"{regexPattern}|{ignoreCase}";
+        var regex = RegexCache.GetOrAdd(cacheKey, key => new Regex(regexPattern, options));
 
         var filteredDirectories = VirtualDirectories.Where(d => regex.IsMatch(d.Name)).ToList();
         var filteredBlobs = Blobs.Where(b => regex.IsMatch(b.Name)).ToList();
