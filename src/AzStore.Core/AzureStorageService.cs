@@ -495,7 +495,25 @@ public class AzureStorageService : IStorageService
             var containerClient = GetContainerClient(session.ContainerName);
             var blobClient = containerClient.GetBlobClient(session.BlobName);
 
-            return await PerformDownloadWithRetryAsync(blobClient, session, options, progress, cancellationToken);
+            // Validate local file state before attempting to resume
+            var validatedSession = await ValidateAndRepairDownloadSessionAsync(session);
+            if (validatedSession == null)
+            {
+                _logger.LogWarning("Download session validation failed, falling back to fresh download: {BlobName}", session.BlobName);
+                
+                // Create a fresh session and start from the beginning
+                var properties = await blobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
+                var freshSession = DownloadSession.Create(
+                    blobName: session.BlobName,
+                    containerName: session.ContainerName,
+                    localFilePath: session.LocalFilePath,
+                    totalBytes: properties.Value.ContentLength,
+                    expectedChecksum: properties.Value.ContentHash?.ToString());
+
+                return await PerformDownloadWithRetryAsync(blobClient, freshSession, options, progress, cancellationToken);
+            }
+
+            return await PerformDownloadWithRetryAsync(blobClient, validatedSession, options, progress, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -815,7 +833,7 @@ public class AzureStorageService : IStorageService
             ConflictResolution.Overwrite => filePath,
             ConflictResolution.Skip => null,
             ConflictResolution.Rename => GenerateUniqueFileName(filePath),
-            ConflictResolution.Ask => await AskUserForConflictResolutionAsync(filePath),
+            ConflictResolution.Ask => await HandleFileConflictWithRenameAsync(filePath),
             _ => throw new ArgumentOutOfRangeException(nameof(resolution), resolution, "Invalid conflict resolution strategy")
         };
     }
@@ -845,52 +863,80 @@ public class AzureStorageService : IStorageService
     }
 
     /// <summary>
-    /// Asks the user interactively how to handle a file conflict.
+    /// Handles file conflicts by automatically renaming the file to avoid overwriting.
+    /// This is a placeholder implementation until interactive user input is added.
     /// </summary>
     /// <param name="filePath">The file path that conflicts.</param>
-    /// <returns>The resolved file path, or null if the user chose to skip.</returns>
-    private Task<string?> AskUserForConflictResolutionAsync(string filePath)
+    /// <returns>A unique file path with a renamed filename.</returns>
+    private Task<string?> HandleFileConflictWithRenameAsync(string filePath)
     {
         _logger.LogWarning("File already exists: {FilePath}", filePath);
-        _logger.LogInformation("Choose an action: (o)verwrite, (s)kip, (r)ename");
-
-        // For now, default to rename until interactive input is implemented
-        // TODO: Implement interactive console input
         _logger.LogInformation("Automatically renaming file to avoid conflict");
         return Task.FromResult<string?>(GenerateUniqueFileName(filePath));
     }
 
     /// <summary>
-    /// Creates the local directory structure mirroring the blob path.
+    /// Validates the local file state matches the download session and repairs if possible.
     /// </summary>
-    /// <param name="sessionPath">The base session path for downloads.</param>
-    /// <param name="containerName">The name of the container.</param>
-    /// <param name="blobPath">The full blob path including virtual directories.</param>
-    /// <returns>The complete local file path with directory structure.</returns>
-    private string CreateLocalDirectoryStructure(string sessionPath, string containerName, string blobPath)
+    /// <param name="session">The download session to validate.</param>
+    /// <returns>A validated session, or null if validation failed and cannot be repaired.</returns>
+    private Task<DownloadSession?> ValidateAndRepairDownloadSessionAsync(DownloadSession session)
     {
-        var containerDirectory = Path.Combine(sessionPath, containerName);
-        var blobDirectory = Path.GetDirectoryName(blobPath);
-
-        string targetDirectory;
-        if (!string.IsNullOrEmpty(blobDirectory))
+        try
         {
-            targetDirectory = Path.Combine(containerDirectory, blobDirectory);
-        }
-        else
-        {
-            targetDirectory = containerDirectory;
-        }
+            // Check if local file exists
+            if (!File.Exists(session.LocalFilePath))
+            {
+                _logger.LogDebug("Local file does not exist for resume: {FilePath}", session.LocalFilePath);
+                return Task.FromResult<DownloadSession?>(null);
+            }
 
-        if (!Directory.Exists(targetDirectory))
-        {
-            Directory.CreateDirectory(targetDirectory);
-            _logger.LogDebug("Created directory structure: {Directory}", targetDirectory);
-        }
+            var fileInfo = new FileInfo(session.LocalFilePath);
+            var actualFileSize = fileInfo.Length;
 
-        var fileName = Path.GetFileName(blobPath);
-        return Path.Combine(targetDirectory, fileName);
+            // Validate file size matches session expectation
+            if (actualFileSize != session.DownloadedBytes)
+            {
+                _logger.LogWarning("Local file size mismatch. Expected: {Expected}, Actual: {Actual} for file: {FilePath}",
+                    session.DownloadedBytes, actualFileSize, session.LocalFilePath);
+
+                // If the file is smaller than expected, we can repair by updating the session
+                if (actualFileSize < session.TotalBytes)
+                {
+                    _logger.LogDebug("Repairing download session with actual file size: {ActualSize}", actualFileSize);
+                    return Task.FromResult<DownloadSession?>(session.UpdateProgress(actualFileSize));
+                }
+
+                // If file is larger than expected or total, we cannot safely resume
+                _logger.LogWarning("Cannot repair session - file is larger than expected");
+                return Task.FromResult<DownloadSession?>(null);
+            }
+
+            // Additional validation: check if file was modified since session was last updated
+            if (fileInfo.LastWriteTimeUtc > session.LastUpdatedAt.UtcDateTime.AddMinutes(1))
+            {
+                _logger.LogWarning("Local file was modified after session was last updated. File: {FilePath}, " +
+                    "File modified: {FileModified}, Session updated: {SessionUpdated}",
+                    session.LocalFilePath, fileInfo.LastWriteTimeUtc, session.LastUpdatedAt.UtcDateTime);
+                
+                // Still attempt to repair if file size makes sense
+                if (actualFileSize < session.TotalBytes)
+                {
+                    return Task.FromResult<DownloadSession?>(session.UpdateProgress(actualFileSize));
+                }
+                return Task.FromResult<DownloadSession?>(null);
+            }
+
+            _logger.LogDebug("Download session validation passed for: {BlobName}", session.BlobName);
+            return Task.FromResult<DownloadSession?>(session);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to validate download session for: {BlobName}", session.BlobName);
+            return Task.FromResult<DownloadSession?>(null);
+        }
     }
+
 
     /// <summary>
     /// Performs the actual download with retry logic and progress tracking.
@@ -909,8 +955,6 @@ public class AzureStorageService : IStorageService
         CancellationToken cancellationToken)
     {
         var currentSession = session;
-        var startTime = DateTimeOffset.UtcNow;
-        var lastProgressReport = startTime;
 
         for (int attempt = 0; attempt <= options.MaxRetryAttempts; attempt++)
         {

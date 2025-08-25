@@ -7,9 +7,9 @@ public class ThrottledStream : Stream
 {
     private readonly Stream _baseStream;
     private readonly long _maxBytesPerSecond;
-    private readonly object _lock = new();
+    private readonly Lock _lock = new();
     private long _totalBytesTransferred;
-    private DateTime _startTime;
+    private readonly DateTime _startTime;
 
     /// <summary>
     /// Initializes a new instance of the ThrottledStream.
@@ -45,6 +45,17 @@ public class ThrottledStream : Stream
         }
     }
 
+    public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+    {
+        await ThrottleIfNeededAsync(buffer.Length, cancellationToken);
+        await _baseStream.WriteAsync(buffer, cancellationToken);
+        
+        lock (_lock)
+        {
+            _totalBytesTransferred += buffer.Length;
+        }
+    }
+
     public override void Write(byte[] buffer, int offset, int count)
     {
         ThrottleIfNeeded(count);
@@ -60,6 +71,19 @@ public class ThrottledStream : Stream
     {
         await ThrottleIfNeededAsync(count, cancellationToken);
         var bytesRead = await _baseStream.ReadAsync(buffer, offset, count, cancellationToken);
+        
+        lock (_lock)
+        {
+            _totalBytesTransferred += bytesRead;
+        }
+        
+        return bytesRead;
+    }
+
+    public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+    {
+        await ThrottleIfNeededAsync(buffer.Length, cancellationToken);
+        var bytesRead = await _baseStream.ReadAsync(buffer, cancellationToken);
         
         lock (_lock)
         {
@@ -111,8 +135,11 @@ public class ThrottledStream : Stream
         lock (_lock)
         {
             var elapsed = DateTime.UtcNow - _startTime;
-            var expectedTime = TimeSpan.FromSeconds((double)(_totalBytesTransferred + bytesToTransfer) / _maxBytesPerSecond);
-            return expectedTime > elapsed ? expectedTime - elapsed : TimeSpan.Zero;
+            var expectedTimeForActualBytes = TimeSpan.FromSeconds((double)_totalBytesTransferred / _maxBytesPerSecond);
+            var expectedTimeForNewBytes = TimeSpan.FromSeconds((double)bytesToTransfer / _maxBytesPerSecond);
+            var totalExpectedTime = expectedTimeForActualBytes + expectedTimeForNewBytes;
+            
+            return totalExpectedTime > elapsed ? totalExpectedTime - elapsed : TimeSpan.Zero;
         }
     }
 

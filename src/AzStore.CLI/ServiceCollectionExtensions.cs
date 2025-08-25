@@ -3,7 +3,6 @@ using AzStore.Core;
 using AzStore.Terminal;
 using AzStore.Terminal.Commands;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 
 namespace AzStore.CLI;
 
