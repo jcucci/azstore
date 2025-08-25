@@ -69,11 +69,66 @@ public interface IStorageService
     /// <param name="overwrite">Whether to overwrite the local file if it already exists.</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>The number of bytes downloaded.</returns>
-    /// <exception cref="ArgumentException">Thrown when any parameter is null or empty.</exception>
     /// <exception cref="UnauthorizedAccessException">Thrown when authentication fails or access is denied.</exception>
     /// <exception cref="InvalidOperationException">Thrown when the blob does not exist or cannot be downloaded.</exception>
     /// <exception cref="IOException">Thrown when there is an issue with the local file system.</exception>
     Task<long> DownloadBlobAsync(string containerName, string blobName, string localFilePath, bool overwrite = false, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Downloads a blob with advanced options and progress tracking.
+    /// </summary>
+    /// <param name="containerName">The name of the container containing the blob.</param>
+    /// <param name="blobName">The name of the blob to download.</param>
+    /// <param name="localFilePath">The local file path where the blob should be downloaded.</param>
+    /// <param name="options">Download options including conflict resolution and retry settings.</param>
+    /// <param name="progress">Optional progress callback for tracking download progress.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A download result with success status and details.</returns>
+    /// <exception cref="UnauthorizedAccessException">Thrown when authentication fails or access is denied.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the blob does not exist or cannot be downloaded.</exception>
+    /// <exception cref="IOException">Thrown when there is an issue with the local file system.</exception>
+    Task<DownloadResult> DownloadBlobWithProgressAsync(string containerName, string blobName, string localFilePath, DownloadOptions? options = null, IProgress<BlobDownloadProgress>? progress = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Downloads multiple blobs matching a pattern with progress tracking.
+    /// </summary>
+    /// <param name="containerName">The name of the container containing the blobs.</param>
+    /// <param name="blobPattern">Pattern to match blob names (supports wildcards * and ?).</param>
+    /// <param name="localDirectoryPath">The local directory path where blobs should be downloaded.</param>
+    /// <param name="options">Download options including conflict resolution and retry settings.</param>
+    /// <param name="progress">Optional progress callback for tracking overall download progress.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A list of download results for each blob.</returns>
+    /// <exception cref="UnauthorizedAccessException">Thrown when authentication fails or access is denied.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the container does not exist.</exception>
+    /// <exception cref="IOException">Thrown when there is an issue with the local file system.</exception>
+    Task<IReadOnlyList<DownloadResult>> DownloadBlobsAsync(string containerName, string blobPattern, string localDirectoryPath, DownloadOptions? options = null, IProgress<DownloadProgress>? progress = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Resumes a previously interrupted download using the download session state.
+    /// </summary>
+    /// <param name="session">The download session containing the current state.</param>
+    /// <param name="options">Download options including retry settings.</param>
+    /// <param name="progress">Optional progress callback for tracking download progress.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A download result with success status and updated session state.</returns>
+    /// <exception cref="UnauthorizedAccessException">Thrown when authentication fails or access is denied.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the blob does not exist or cannot be downloaded.</exception>
+    /// <exception cref="IOException">Thrown when there is an issue with the local file system.</exception>
+    Task<DownloadResult> ResumeDownloadAsync(DownloadSession session, DownloadOptions? options = null, IProgress<BlobDownloadProgress>? progress = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Verifies the integrity of a downloaded blob by comparing checksums.
+    /// </summary>
+    /// <param name="containerName">The name of the container containing the blob.</param>
+    /// <param name="blobName">The name of the blob to verify.</param>
+    /// <param name="localFilePath">The local file path of the downloaded blob.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>True if the file integrity is verified, false if checksums don't match.</returns>
+    /// <exception cref="FileNotFoundException">Thrown when the local file does not exist.</exception>
+    /// <exception cref="UnauthorizedAccessException">Thrown when authentication fails or access is denied.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the blob does not exist.</exception>
+    Task<bool> VerifyDownloadIntegrityAsync(string containerName, string blobName, string localFilePath, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Lists blobs and virtual directories in the specified container using hierarchical listing.
