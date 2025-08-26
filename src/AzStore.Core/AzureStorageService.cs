@@ -1,5 +1,6 @@
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
+using AzStore.Core.IO;
 using AzStore.Core.Models;
 using Microsoft.Extensions.Logging;
 using System.Text.RegularExpressions;
@@ -354,6 +355,219 @@ public class AzureStorageService : IStorageService
         }
     }
 
+    /// <inheritdoc/>
+    public async Task<DownloadResult> DownloadBlobWithProgressAsync(string containerName, string blobName, string localFilePath, DownloadOptions? options = null, IProgress<BlobDownloadProgress>? progress = null, CancellationToken cancellationToken = default)
+    {
+        options ??= DownloadOptions.Default;
+
+        _logger.LogDebug("Downloading blob with progress: {BlobName} from container: {ContainerName} to: {LocalFilePath}", blobName, containerName, localFilePath);
+
+        try
+        {
+            var containerClient = GetContainerClient(containerName);
+            var blobClient = containerClient.GetBlobClient(blobName);
+
+            var properties = await blobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
+            var totalBytes = properties.Value.ContentLength;
+            var expectedChecksum = properties.Value.ContentHash?.ToString();
+
+            progress?.Report(BlobDownloadProgress.Starting(blobName, totalBytes));
+
+            var resolvedFilePath = await ResolveFileConflictAsync(localFilePath, options.ConflictResolution);
+            if (resolvedFilePath == null)
+            {
+                return new DownloadResult(
+                    BlobName: blobName,
+                    LocalFilePath: localFilePath,
+                    BytesDownloaded: 0,
+                    Success: false,
+                    Error: "Download cancelled due to file conflict");
+            }
+
+            if (options.CreateDirectories)
+            {
+                var directory = Path.GetDirectoryName(resolvedFilePath);
+                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                    _logger.LogDebug("Created directory: {Directory}", directory);
+                }
+            }
+
+            var downloadSession = DownloadSession.Create(blobName, containerName, resolvedFilePath, totalBytes, expectedChecksum);
+
+            var result = await PerformDownloadWithRetryAsync(blobClient, downloadSession, options, progress, cancellationToken);
+
+            if (result.Success && options.VerifyChecksum && !string.IsNullOrEmpty(expectedChecksum))
+            {
+                progress?.Report(new BlobDownloadProgress(blobName, totalBytes, totalBytes, 100, 0, 0, 0, DownloadStage.Verifying));
+
+                var isValid = await VerifyDownloadIntegrityAsync(containerName, blobName, resolvedFilePath, cancellationToken);
+                if (!isValid)
+                {
+                    return new DownloadResult(
+                        BlobName: blobName,
+                        LocalFilePath: resolvedFilePath,
+                        BytesDownloaded: result.BytesDownloaded,
+                        Success: false,
+                        Error: "Download integrity verification failed");
+                }
+            }
+
+            progress?.Report(BlobDownloadProgress.Completed(blobName, totalBytes));
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to download blob with progress: {BlobName} from container: {ContainerName}", blobName, containerName);
+            return new DownloadResult(
+                BlobName: blobName,
+                LocalFilePath: localFilePath,
+                BytesDownloaded: 0,
+                Success: false,
+                Error: ex.Message);
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<DownloadResult>> DownloadBlobsAsync(string containerName, string blobPattern, string localDirectoryPath, DownloadOptions? options = null, IProgress<DownloadProgress>? progress = null, CancellationToken cancellationToken = default)
+    {
+        options ??= DownloadOptions.Default;
+
+        _logger.LogDebug("Downloading blobs matching pattern: {Pattern} from container: {ContainerName} to: {LocalDirectory}", blobPattern, containerName, localDirectoryPath);
+
+        try
+        {
+            var pageRequest = new PageRequest(1000);
+            var matchingBlobs = await SearchBlobsAsync(containerName, blobPattern, null, pageRequest, cancellationToken);
+
+            var results = new List<DownloadResult>();
+            var totalBlobs = matchingBlobs.Items.Count;
+            var completedBlobs = 0;
+
+            foreach (var blob in matchingBlobs.Items)
+            {
+                if (cancellationToken.IsCancellationRequested)
+                    break;
+
+                var localFilePath = Path.Combine(localDirectoryPath, blob.Name);
+
+                var blobProgress = new Progress<BlobDownloadProgress>(p =>
+                {
+                    var overallProgress = new DownloadProgress(
+                        TotalBlobs: totalBlobs,
+                        CompletedBlobs: completedBlobs,
+                        CurrentBlobName: p.BlobName,
+                        CurrentBlobProgress: p.ProgressPercentage / 100.0,
+                        TotalBytesDownloaded: results.Sum(r => r.BytesDownloaded) + p.DownloadedBytes);
+
+                    progress?.Report(overallProgress);
+                });
+
+                var result = await DownloadBlobWithProgressAsync(containerName, blob.Name, localFilePath, options, blobProgress, cancellationToken);
+                results.Add(result);
+
+                if (result.Success)
+                {
+                    completedBlobs++;
+                }
+            }
+
+            return results.AsReadOnly();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to download blobs matching pattern: {Pattern} from container: {ContainerName}", blobPattern, containerName);
+            throw new InvalidOperationException($"Failed to download blobs matching pattern '{blobPattern}' from container '{containerName}': {ex.Message}", ex);
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<DownloadResult> ResumeDownloadAsync(DownloadSession session, DownloadOptions? options = null, IProgress<BlobDownloadProgress>? progress = null, CancellationToken cancellationToken = default)
+    {
+        options ??= DownloadOptions.Default;
+
+        _logger.LogDebug("Resuming download: {BlobName} from container: {ContainerName}", session.BlobName, session.ContainerName);
+
+        try
+        {
+            var containerClient = GetContainerClient(session.ContainerName);
+            var blobClient = containerClient.GetBlobClient(session.BlobName);
+
+            // Validate local file state before attempting to resume
+            var validatedSession = await ValidateAndRepairDownloadSessionAsync(session);
+            if (validatedSession == null)
+            {
+                _logger.LogWarning("Download session validation failed, falling back to fresh download: {BlobName}", session.BlobName);
+                
+                // Create a fresh session and start from the beginning
+                var properties = await blobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
+                var freshSession = DownloadSession.Create(
+                    blobName: session.BlobName,
+                    containerName: session.ContainerName,
+                    localFilePath: session.LocalFilePath,
+                    totalBytes: properties.Value.ContentLength,
+                    expectedChecksum: properties.Value.ContentHash?.ToString());
+
+                return await PerformDownloadWithRetryAsync(blobClient, freshSession, options, progress, cancellationToken);
+            }
+
+            return await PerformDownloadWithRetryAsync(blobClient, validatedSession, options, progress, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to resume download: {BlobName} from container: {ContainerName}", session.BlobName, session.ContainerName);
+            return new DownloadResult(
+                BlobName: session.BlobName,
+                LocalFilePath: session.LocalFilePath,
+                BytesDownloaded: session.DownloadedBytes,
+                Success: false,
+                Error: ex.Message);
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<bool> VerifyDownloadIntegrityAsync(string containerName, string blobName, string localFilePath, CancellationToken cancellationToken = default)
+    {
+        _logger.LogDebug("Verifying download integrity: {BlobName} at {LocalFilePath}", blobName, localFilePath);
+
+        try
+        {
+            if (!File.Exists(localFilePath))
+            {
+                throw new FileNotFoundException($"Local file not found: {localFilePath}");
+            }
+
+            var containerClient = GetContainerClient(containerName);
+            var blobClient = containerClient.GetBlobClient(blobName);
+
+            var properties = await blobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
+            var expectedHash = properties.Value.ContentHash;
+
+            if (expectedHash == null || expectedHash.Length == 0)
+            {
+                _logger.LogWarning("Blob {BlobName} has no content hash for verification", blobName);
+                return true;
+            }
+
+            using var fileStream = File.OpenRead(localFilePath);
+            using var md5 = System.Security.Cryptography.MD5.Create();
+            var actualHash = await md5.ComputeHashAsync(fileStream, cancellationToken);
+
+            var isValid = expectedHash.SequenceEqual(actualHash);
+
+            _logger.LogDebug("Download integrity verification result: {IsValid} for {BlobName}", isValid, blobName);
+
+            return isValid;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to verify download integrity: {BlobName}", blobName);
+            throw new InvalidOperationException($"Failed to verify download integrity for blob '{blobName}': {ex.Message}", ex);
+        }
+    }
+
 
     /// <inheritdoc/>
     public async Task<BrowsingResult> BrowseBlobsAsync(string containerName, string? prefix, PageRequest pageRequest, CancellationToken cancellationToken = default)
@@ -390,7 +604,12 @@ public class AzureStorageService : IStorageService
             _logger.LogDebug("Retrieved {DirectoryCount} directories and {BlobCount} blobs from container: {ContainerName}",
                 virtualDirectories.Count, blobs.Count, containerName);
 
-            return BrowsingResult.Create(virtualDirectories, blobs, containerName, prefix, page.ContinuationToken);
+            return BrowsingResult.Create(
+                directories: virtualDirectories,
+                blobs: blobs,
+                containerName: containerName,
+                currentPrefix: prefix,
+                continuationToken: page.ContinuationToken);
         }
 
         _logger.LogDebug("No items found in container: {ContainerName}", containerName);
@@ -406,10 +625,7 @@ public class AzureStorageService : IStorageService
         var containerClient = GetContainerClient(containerName);
         var directories = new List<VirtualDirectory>();
 
-        var pages = containerClient.GetBlobsByHierarchyAsync(
-                delimiter: "/",
-                prefix: prefix,
-                cancellationToken: cancellationToken)
+        var pages = containerClient.GetBlobsByHierarchyAsync(delimiter: "/", prefix: prefix, cancellationToken: cancellationToken)
             .AsPages(pageRequest.ContinuationToken, pageRequest.PageSize);
 
         await foreach (var page in pages)
@@ -423,8 +639,7 @@ public class AzureStorageService : IStorageService
                 }
             }
 
-            _logger.LogDebug("Retrieved {DirectoryCount} virtual directories from container: {ContainerName}",
-                directories.Count, containerName);
+            _logger.LogDebug("Retrieved {DirectoryCount} virtual directories from container: {ContainerName}", directories.Count, containerName);
 
             return new PagedResult<VirtualDirectory>(directories, page.ContinuationToken);
         }
@@ -599,6 +814,323 @@ public class AzureStorageService : IStorageService
         {
             _logger.LogDebug(ex, "Could not retrieve access policy for container: {ContainerName}", containerName);
             return ContainerAccessLevel.None;
+        }
+    }
+
+    /// <summary>
+    /// Resolves file conflicts based on the specified resolution strategy.
+    /// </summary>
+    /// <param name="filePath">The intended file path.</param>
+    /// <param name="resolution">The conflict resolution strategy.</param>
+    /// <returns>The resolved file path, or null if the user chose to skip.</returns>
+    private async Task<string?> ResolveFileConflictAsync(string filePath, ConflictResolution resolution)
+    {
+        if (!File.Exists(filePath))
+            return filePath;
+
+        return resolution switch
+        {
+            ConflictResolution.Overwrite => filePath,
+            ConflictResolution.Skip => null,
+            ConflictResolution.Rename => GenerateUniqueFileName(filePath),
+            ConflictResolution.Ask => await HandleFileConflictWithRenameAsync(filePath),
+            _ => throw new ArgumentOutOfRangeException(nameof(resolution), resolution, "Invalid conflict resolution strategy")
+        };
+    }
+
+    /// <summary>
+    /// Generates a unique file name by appending a number to avoid conflicts.
+    /// </summary>
+    /// <param name="originalPath">The original file path.</param>
+    /// <returns>A unique file path.</returns>
+    private static string GenerateUniqueFileName(string originalPath)
+    {
+        var directory = Path.GetDirectoryName(originalPath) ?? string.Empty;
+        var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(originalPath);
+        var extension = Path.GetExtension(originalPath);
+
+        var counter = 1;
+        string newPath;
+        do
+        {
+            var newFileName = $"{fileNameWithoutExtension}({counter}){extension}";
+            newPath = Path.Combine(directory, newFileName);
+            counter++;
+        }
+        while (File.Exists(newPath));
+
+        return newPath;
+    }
+
+    /// <summary>
+    /// Handles file conflicts by automatically renaming the file to avoid overwriting.
+    /// This is a placeholder implementation until interactive user input is added.
+    /// </summary>
+    /// <param name="filePath">The file path that conflicts.</param>
+    /// <returns>A unique file path with a renamed filename.</returns>
+    private Task<string?> HandleFileConflictWithRenameAsync(string filePath)
+    {
+        _logger.LogWarning("File already exists: {FilePath}", filePath);
+        _logger.LogInformation("Automatically renaming file to avoid conflict");
+        return Task.FromResult<string?>(GenerateUniqueFileName(filePath));
+    }
+
+    /// <summary>
+    /// Validates the local file state matches the download session and repairs if possible.
+    /// </summary>
+    /// <param name="session">The download session to validate.</param>
+    /// <returns>A validated session, or null if validation failed and cannot be repaired.</returns>
+    private Task<DownloadSession?> ValidateAndRepairDownloadSessionAsync(DownloadSession session)
+    {
+        try
+        {
+            // Check if local file exists
+            if (!File.Exists(session.LocalFilePath))
+            {
+                _logger.LogDebug("Local file does not exist for resume: {FilePath}", session.LocalFilePath);
+                return Task.FromResult<DownloadSession?>(null);
+            }
+
+            var fileInfo = new FileInfo(session.LocalFilePath);
+            var actualFileSize = fileInfo.Length;
+
+            // Validate file size matches session expectation
+            if (actualFileSize != session.DownloadedBytes)
+            {
+                _logger.LogWarning("Local file size mismatch. Expected: {Expected}, Actual: {Actual} for file: {FilePath}",
+                    session.DownloadedBytes, actualFileSize, session.LocalFilePath);
+
+                // If the file is smaller than expected, we can repair by updating the session
+                if (actualFileSize < session.TotalBytes)
+                {
+                    _logger.LogDebug("Repairing download session with actual file size: {ActualSize}", actualFileSize);
+                    return Task.FromResult<DownloadSession?>(session.UpdateProgress(actualFileSize));
+                }
+
+                // If file is larger than expected or total, we cannot safely resume
+                _logger.LogWarning("Cannot repair session - file is larger than expected");
+                return Task.FromResult<DownloadSession?>(null);
+            }
+
+            // Additional validation: check if file was modified since session was last updated
+            if (fileInfo.LastWriteTimeUtc > session.LastUpdatedAt.UtcDateTime.AddMinutes(1))
+            {
+                _logger.LogWarning("Local file was modified after session was last updated. File: {FilePath}, " +
+                    "File modified: {FileModified}, Session updated: {SessionUpdated}",
+                    session.LocalFilePath, fileInfo.LastWriteTimeUtc, session.LastUpdatedAt.UtcDateTime);
+                
+                // Still attempt to repair if file size makes sense
+                if (actualFileSize < session.TotalBytes)
+                {
+                    return Task.FromResult<DownloadSession?>(session.UpdateProgress(actualFileSize));
+                }
+                return Task.FromResult<DownloadSession?>(null);
+            }
+
+            _logger.LogDebug("Download session validation passed for: {BlobName}", session.BlobName);
+            return Task.FromResult<DownloadSession?>(session);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to validate download session for: {BlobName}", session.BlobName);
+            return Task.FromResult<DownloadSession?>(null);
+        }
+    }
+
+
+    /// <summary>
+    /// Performs the actual download with retry logic and progress tracking.
+    /// </summary>
+    /// <param name="blobClient">The blob client to download from.</param>
+    /// <param name="session">The download session containing state.</param>
+    /// <param name="options">Download options.</param>
+    /// <param name="progress">Progress callback.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The download result.</returns>
+    private async Task<DownloadResult> PerformDownloadWithRetryAsync(
+        BlobClient blobClient,
+        DownloadSession session,
+        DownloadOptions options,
+        IProgress<BlobDownloadProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        var currentSession = session;
+
+        for (int attempt = 0; attempt <= options.MaxRetryAttempts; attempt++)
+        {
+            try
+            {
+                if (attempt > 0)
+                {
+                    var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt - 1)); // Exponential backoff
+                    _logger.LogInformation("Retrying download attempt {Attempt} after {Delay}s delay", attempt + 1, delay.TotalSeconds);
+                    await Task.Delay(delay, cancellationToken);
+
+                    progress?.Report(BlobDownloadProgress.Update(
+                        currentSession.BlobName,
+                        currentSession.TotalBytes,
+                        currentSession.DownloadedBytes,
+                        0,
+                        attempt));
+                }
+
+                var result = await PerformSingleDownloadAsync(blobClient, currentSession, options, progress, cancellationToken);
+
+                if (result.Success)
+                {
+                    return result;
+                }
+
+                // If resumption is enabled and we have some data, update session for retry
+                if (options.EnableResumption && File.Exists(currentSession.LocalFilePath))
+                {
+                    var fileInfo = new FileInfo(currentSession.LocalFilePath);
+                    currentSession = currentSession.UpdateProgress(fileInfo.Length).IncrementRetryCount();
+                }
+                else
+                {
+                    currentSession = currentSession.IncrementRetryCount();
+                }
+
+                if (attempt == options.MaxRetryAttempts)
+                {
+                    return result; // Return the failed result after max retries
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                return new DownloadResult(
+                    BlobName: currentSession.BlobName,
+                    LocalFilePath: currentSession.LocalFilePath,
+                    BytesDownloaded: currentSession.DownloadedBytes,
+                    Success: false,
+                    Error: "Download was cancelled");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Download attempt {Attempt} failed for blob: {BlobName}", attempt + 1, currentSession.BlobName);
+
+                if (attempt == options.MaxRetryAttempts)
+                {
+                    return new DownloadResult(
+                        BlobName: currentSession.BlobName,
+                        LocalFilePath: currentSession.LocalFilePath,
+                        BytesDownloaded: currentSession.DownloadedBytes,
+                        Success: false,
+                        Error: ex.Message);
+                }
+            }
+        }
+
+        // This should never be reached, but provides a fallback
+        return new DownloadResult(
+            BlobName: currentSession.BlobName,
+            LocalFilePath: currentSession.LocalFilePath,
+            BytesDownloaded: currentSession.DownloadedBytes,
+            Success: false,
+            Error: "Maximum retry attempts exceeded");
+    }
+
+    /// <summary>
+    /// Performs a single download attempt with progress tracking and bandwidth throttling.
+    /// </summary>
+    private async Task<DownloadResult> PerformSingleDownloadAsync(
+        BlobClient blobClient,
+        DownloadSession session,
+        DownloadOptions options,
+        IProgress<BlobDownloadProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        var startTime = DateTimeOffset.UtcNow;
+        var lastProgressReport = startTime;
+        var startOffset = session.StartOffset;
+
+        try
+        {
+            // Open or create the local file
+            using var fileStream = startOffset > 0
+                ? new FileStream(path: session.LocalFilePath, mode: FileMode.Open, access: FileAccess.Write, share: FileShare.None)
+                : new FileStream(path: session.LocalFilePath, mode: FileMode.Create, access: FileAccess.Write, share: FileShare.None);
+
+            if (startOffset > 0)
+            {
+                fileStream.Seek(startOffset, SeekOrigin.Begin);
+            }
+
+            // Wrap with throttling stream if bandwidth limit is specified
+            Stream targetStream = options.BandwidthLimitBytesPerSecond.HasValue
+                ? new ThrottledStream(fileStream, options.BandwidthLimitBytesPerSecond.Value)
+                : fileStream;
+
+            // Create progress tracking stream
+            var progressStream = new ProgressTrackingStream(targetStream, totalBytes =>
+            {
+                var now = DateTimeOffset.UtcNow;
+                var elapsed = now - lastProgressReport;
+
+                // Throttle progress reports to avoid spam
+                if (elapsed.TotalMilliseconds >= 250) // Report every 250ms
+                {
+                    var currentBytes = startOffset + totalBytes;
+                    var elapsedSinceStart = now - startTime;
+                    var bytesPerSecond = elapsedSinceStart.TotalSeconds > 0
+                        ? (long)(totalBytes / elapsedSinceStart.TotalSeconds)
+                        : 0;
+
+                    progress?.Report(BlobDownloadProgress.Update(
+                        session.BlobName,
+                        session.TotalBytes,
+                        currentBytes,
+                        bytesPerSecond,
+                        session.RetryCount));
+
+                    lastProgressReport = now;
+                }
+            });
+
+            // Download the blob content with range if resuming
+            if (startOffset > 0)
+            {
+                var downloadOptions = new BlobDownloadOptions
+                {
+                    Range = new Azure.HttpRange(offset: startOffset, length: session.TotalBytes - startOffset)
+                };
+                var response = await blobClient.DownloadStreamingAsync(downloadOptions, cancellationToken);
+                await response.Value.Content.CopyToAsync(progressStream, cancellationToken);
+            }
+            else
+            {
+                var response = await blobClient.DownloadStreamingAsync(cancellationToken: cancellationToken);
+                await response.Value.Content.CopyToAsync(progressStream, cancellationToken);
+            }
+
+            var finalFileInfo = new FileInfo(session.LocalFilePath);
+            var totalBytesDownloaded = finalFileInfo.Length;
+
+            _logger.LogInformation("Successfully downloaded blob: {BlobName} ({BytesDownloaded} bytes)",
+                session.BlobName, totalBytesDownloaded);
+
+            return new DownloadResult(
+                BlobName: session.BlobName,
+                LocalFilePath: session.LocalFilePath,
+                BytesDownloaded: totalBytesDownloaded,
+                Success: true);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to download blob: {BlobName}", session.BlobName);
+
+            // Return current progress even on failure
+            var currentBytes = File.Exists(session.LocalFilePath)
+                ? new FileInfo(session.LocalFilePath).Length
+                : 0;
+
+            return new DownloadResult(
+                BlobName: session.BlobName,
+                LocalFilePath: session.LocalFilePath,
+                BytesDownloaded: currentBytes,
+                Success: false,
+                Error: ex.Message);
         }
     }
 }

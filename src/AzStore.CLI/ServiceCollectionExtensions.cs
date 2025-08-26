@@ -3,7 +3,6 @@ using AzStore.Core;
 using AzStore.Terminal;
 using AzStore.Terminal.Commands;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 
 namespace AzStore.CLI;
 
@@ -23,6 +22,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<ICommand, ExitCommand>();
         services.AddTransient<ICommand, HelpCommand>();
         services.AddTransient<ICommand, ListCommand>();
+        services.AddTransient<ICommand, DownloadCommand>();
         services.AddSingleton<ICommandRegistry, CommandRegistry>();
 
         services.AddHostedService<ReplHostedService>();
