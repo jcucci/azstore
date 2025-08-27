@@ -158,6 +158,59 @@ public class BlobBrowserViewTests
         Assert.Equal("", result);
     }
 
+    [Fact]
+    public void BlobBrowserView_MultiCharKeyBindings_InitializedCorrectly()
+    {
+        var logger = Substitute.For<ILogger<BlobBrowserView>>();
+        var keyBindings = new KeyBindings
+        {
+            Top = "gg",
+            Bottom = "G",
+            Download = "dd",
+            KeySequenceTimeout = 500
+        };
+        
+        var view = new BlobBrowserView(logger, keyBindings);
+        
+        // Test passes if no exception is thrown during instantiation
+        Assert.NotNull(view);
+    }
+
+    [Fact]
+    public void NavigationRequested_Event_CanBeSubscribed()
+    {
+        var logger = Substitute.For<ILogger<BlobBrowserView>>();
+        var keyBindings = new KeyBindings();
+        var view = new BlobBrowserView(logger, keyBindings);
+        
+        bool eventFired = false;
+        NavigationResult? receivedResult = null;
+        
+        view.NavigationRequested += (sender, result) =>
+        {
+            eventFired = true;
+            receivedResult = result;
+        };
+        
+        // Manually trigger a navigation event by using reflection to call handler
+        var method = typeof(BlobBrowserView).GetMethod("HandleJumpToTop", 
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        
+        // Setup some test items first
+        var items = new List<StorageItem> 
+        { 
+            Container.Create("test", "/test") 
+        };
+        var navigationState = NavigationState.CreateAtRoot("session", "account");
+        view.UpdateItems(items, navigationState);
+        
+        method?.Invoke(view, null);
+        
+        Assert.True(eventFired);
+        Assert.NotNull(receivedResult);
+        Assert.Equal(NavigationAction.JumpToTop, receivedResult.Action);
+    }
+
     // Helper method to access private static methods via reflection for testing
     private static string InvokeFormatStorageItem(StorageItem item)
     {
