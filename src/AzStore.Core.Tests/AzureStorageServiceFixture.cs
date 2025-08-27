@@ -10,7 +10,9 @@ public static class AzureStorageServiceFixture
     {
         var logger = Substitute.For<ILogger<AzureStorageService>>();
         var authService = Substitute.For<IAuthenticationService>();
-        return new AzureStorageService(logger, authService);
+        var pathService = Substitute.For<IPathService>();
+        var sessionManager = Substitute.For<ISessionManager>();
+        return new AzureStorageService(logger, authService, pathService, sessionManager);
     }
 
     public static AzureStorageService CreateWithMockLogger()

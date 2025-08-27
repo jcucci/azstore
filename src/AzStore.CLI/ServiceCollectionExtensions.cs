@@ -16,6 +16,7 @@ public static class ServiceCollectionExtensions
             .ValidateOnStart();
 
         services.AddSingleton<IAuthenticationService, AuthenticationService>();
+        services.AddSingleton<IPathService, PathService>();
         services.AddSingleton<IStorageService, AzureStorageService>();
         services.AddSingleton<IReplEngine, ReplEngine>();
         services.AddSingleton<ITerminalUI, TerminalGuiUI>();

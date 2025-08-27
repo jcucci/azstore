@@ -8,15 +8,19 @@ public class DownloadCommand : ICommand
 {
     private readonly ILogger<DownloadCommand> _logger;
     private readonly IStorageService _storageService;
+    private readonly IPathService _pathService;
+    private readonly ISessionManager? _sessionManager;
 
     public string Name => "download";
     public string[] Aliases => ["dl", "get"];
     public string Description => "Download blob(s) from Azure storage";
 
-    public DownloadCommand(ILogger<DownloadCommand> logger, IStorageService storageService)
+    public DownloadCommand(ILogger<DownloadCommand> logger, IStorageService storageService, IPathService pathService, ISessionManager? sessionManager = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _storageService = storageService ?? throw new ArgumentNullException(nameof(storageService));
+        _pathService = pathService ?? throw new ArgumentNullException(nameof(pathService));
+        _sessionManager = sessionManager;
     }
 
     public async Task<CommandResult> ExecuteAsync(string[] args, CancellationToken cancellationToken = default)
@@ -39,7 +43,7 @@ public class DownloadCommand : ICommand
         try
         {
             var options = ParseOptions(args.Skip(3));
-            
+
             // Check if this is a pattern-based download or single blob
             if (blobPattern.Contains('*') || blobPattern.Contains('?'))
             {
@@ -58,46 +62,43 @@ public class DownloadCommand : ICommand
     }
 
     private async Task<CommandResult> DownloadSingleBlobAsync(
-        string containerName, 
-        string blobName, 
-        string localPath, 
-        DownloadOptions options, 
+        string containerName,
+        string blobName,
+        string localPath,
+        DownloadOptions options,
         CancellationToken cancellationToken)
     {
         _logger.LogInformation("Downloading {BlobName} from {ContainerName}", blobName, containerName);
 
-        // Determine if localPath is a directory or file
-        var targetPath = Directory.Exists(localPath) || localPath.EndsWith(Path.DirectorySeparatorChar)
-            ? Path.Combine(localPath, blobName)
-            : localPath;
+        var targetPath = await CalculateTargetPathAsync(containerName, blobName, localPath, cancellationToken);
 
         var progress = new Progress<BlobDownloadProgress>(DisplayProgress);
 
         var result = await _storageService.DownloadBlobWithProgressAsync(
-            containerName: containerName, 
-            blobName: blobName, 
-            localFilePath: targetPath, 
-            options: options, 
-            progress: progress, 
+            containerName: containerName,
+            blobName: blobName,
+            localFilePath: targetPath,
+            options: options,
+            progress: progress,
             cancellationToken: cancellationToken);
 
         if (result.Success)
         {
-            Console.WriteLine(); // New line after progress
+            Console.WriteLine();
             return CommandResult.Ok($"Successfully downloaded {blobName} ({result.BytesDownloaded:N0} bytes) to {result.LocalFilePath}");
         }
         else
         {
-            Console.WriteLine(); // New line after progress
+            Console.WriteLine();
             return CommandResult.Error($"Failed to download {blobName}: {result.Error}");
         }
     }
 
     private async Task<CommandResult> DownloadMultipleBlobsAsync(
-        string containerName, 
-        string blobPattern, 
-        string localDirectory, 
-        DownloadOptions options, 
+        string containerName,
+        string blobPattern,
+        string localDirectory,
+        DownloadOptions options,
         CancellationToken cancellationToken)
     {
         _logger.LogInformation("Downloading blobs matching pattern {Pattern} from {ContainerName}", blobPattern, containerName);
@@ -110,14 +111,14 @@ public class DownloadCommand : ICommand
         var overallProgress = new Progress<DownloadProgress>(DisplayOverallProgress);
 
         var results = await _storageService.DownloadBlobsAsync(
-            containerName: containerName, 
-            blobPattern: blobPattern, 
-            localDirectoryPath: localDirectory, 
-            options: options, 
-            progress: overallProgress, 
+            containerName: containerName,
+            blobPattern: blobPattern,
+            localDirectoryPath: localDirectory,
+            options: options,
+            progress: overallProgress,
             cancellationToken: cancellationToken);
 
-        Console.WriteLine(); // New line after progress
+        Console.WriteLine();
 
         var successful = results.Count(r => r.Success);
         var total = results.Count;
@@ -162,7 +163,7 @@ public class DownloadCommand : ICommand
                     {
                         var limitBytesPerSecond = (long)(limitMB * 1024 * 1024);
                         options = options with { BandwidthLimitBytesPerSecond = limitBytesPerSecond };
-                        i++; // Skip the next argument as it's the limit value
+                        i++;
                     }
                     break;
             }
@@ -177,7 +178,7 @@ public class DownloadCommand : ICommand
         var speed = FormatBytes(progress.BytesPerSecond);
         var downloaded = FormatBytes(progress.DownloadedBytes);
         var total = FormatBytes(progress.TotalBytes);
-        var eta = progress.EstimatedTimeRemainingSeconds.HasValue 
+        var eta = progress.EstimatedTimeRemainingSeconds.HasValue
             ? TimeSpan.FromSeconds(progress.EstimatedTimeRemainingSeconds.Value).ToString(@"mm\:ss")
             : "--:--";
 
@@ -189,10 +190,10 @@ public class DownloadCommand : ICommand
 
     private static void DisplayOverallProgress(DownloadProgress progress)
     {
-        var percentage = progress.TotalBlobs > 0 
-            ? (double)progress.CompletedBlobs / progress.TotalBlobs * 100 
+        var percentage = progress.TotalBlobs > 0
+            ? (double)progress.CompletedBlobs / progress.TotalBlobs * 100
             : 0;
-        
+
         var progressBar = CreateProgressBar(percentage, 40);
         var totalBytes = FormatBytes(progress.TotalBytesDownloaded);
 
@@ -217,5 +218,32 @@ public class DownloadCommand : ICommand
             len /= 1024;
         }
         return $"{len:F1} {sizes[order]}";
+    }
+
+    /// <summary>
+    /// Calculates the target path for a blob download, using session-aware paths when appropriate.
+    /// </summary>
+    private async Task<string> CalculateTargetPathAsync(string containerName, string blobName, string userSpecifiedPath, CancellationToken cancellationToken)
+    {
+        if (userSpecifiedPath == "." || Directory.Exists(userSpecifiedPath) || userSpecifiedPath.EndsWith(Path.DirectorySeparatorChar))
+        {
+            var session = _sessionManager != null
+                ? await _sessionManager.GetActiveSessionAsync(cancellationToken)
+                : null;
+
+            if (session != null)
+            {
+                return _pathService.CalculateBlobDownloadPath(session, containerName, blobName);
+            }
+            else
+            {
+                var localBlobPath = _pathService.PreserveVirtualDirectoryStructure(blobName);
+                return Path.Combine(userSpecifiedPath, localBlobPath);
+            }
+        }
+        else
+        {
+            return userSpecifiedPath;
+        }
     }
 }

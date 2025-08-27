@@ -12,13 +12,17 @@ public class DownloadCommandTests
 {
     private readonly ILogger<DownloadCommand> _logger;
     private readonly IStorageService _storageService;
+    private readonly IPathService _pathService;
+    private readonly ISessionManager _sessionManager;
     private readonly DownloadCommand _command;
 
     public DownloadCommandTests()
     {
         _logger = Substitute.For<ILogger<DownloadCommand>>();
         _storageService = Substitute.For<IStorageService>();
-        _command = new DownloadCommand(_logger, _storageService);
+        _pathService = Substitute.For<IPathService>();
+        _sessionManager = Substitute.For<ISessionManager>();
+        _command = new DownloadCommand(_logger, _storageService, _pathService, _sessionManager);
     }
 
     [Fact]
