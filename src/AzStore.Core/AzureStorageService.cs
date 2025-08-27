@@ -14,6 +14,8 @@ public class AzureStorageService : IStorageService
 {
     private readonly ILogger<AzureStorageService> _logger;
     private readonly IAuthenticationService _authenticationService;
+    private readonly IPathService _pathService;
+    private readonly ISessionManager? _sessionManager;
 
     private readonly Lock _lock = new();
     private BlobServiceClient? _blobServiceClient;
@@ -27,10 +29,14 @@ public class AzureStorageService : IStorageService
     /// </summary>
     /// <param name="logger">Logger instance for this service.</param>
     /// <param name="authenticationService">Service for Azure authentication.</param>
-    public AzureStorageService(ILogger<AzureStorageService> logger, IAuthenticationService authenticationService)
+    /// <param name="pathService">Service for path calculation and directory management.</param>
+    /// <param name="sessionManager">Service for session management (optional).</param>
+    public AzureStorageService(ILogger<AzureStorageService> logger, IAuthenticationService authenticationService, IPathService pathService, ISessionManager? sessionManager = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _authenticationService = authenticationService ?? throw new ArgumentNullException(nameof(authenticationService));
+        _pathService = pathService ?? throw new ArgumentNullException(nameof(pathService));
+        _sessionManager = sessionManager;
     }
 
     /// <summary>
@@ -224,7 +230,7 @@ public class AzureStorageService : IStorageService
     /// <inheritdoc/>
     public async Task<bool> ValidateContainerAccessAsync(string containerName, CancellationToken cancellationToken = default)
     {
-        EnsureConnected(); // Explicit connection check that throws for infrastructure issues
+        EnsureConnected();
 
         _logger.LogDebug("Validating container access: {ContainerName}", containerName);
 
@@ -386,11 +392,15 @@ public class AzureStorageService : IStorageService
 
             if (options.CreateDirectories)
             {
-                var directory = Path.GetDirectoryName(resolvedFilePath);
-                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                var directoryCreated = await _pathService.EnsureDirectoryExistsAsync(resolvedFilePath, cancellationToken);
+                if (!directoryCreated)
                 {
-                    Directory.CreateDirectory(directory);
-                    _logger.LogDebug("Created directory: {Directory}", directory);
+                    return new DownloadResult(
+                        BlobName: blobName,
+                        LocalFilePath: resolvedFilePath,
+                        BytesDownloaded: 0,
+                        Success: false,
+                        Error: "Failed to create directory structure");
                 }
             }
 
@@ -451,7 +461,12 @@ public class AzureStorageService : IStorageService
                 if (cancellationToken.IsCancellationRequested)
                     break;
 
-                var localFilePath = Path.Combine(localDirectoryPath, blob.Name);
+                var session = _sessionManager != null 
+                    ? await _sessionManager.GetActiveSessionAsync(cancellationToken) 
+                    : null;
+                var localFilePath = session != null 
+                    ? _pathService.CalculateBlobDownloadPath(session, containerName, blob.Name)
+                    : Path.Combine(localDirectoryPath, _pathService.PreserveVirtualDirectoryStructure(blob.Name));
 
                 var blobProgress = new Progress<BlobDownloadProgress>(p =>
                 {
@@ -501,7 +516,6 @@ public class AzureStorageService : IStorageService
             {
                 _logger.LogWarning("Download session validation failed, falling back to fresh download: {BlobName}", session.BlobName);
                 
-                // Create a fresh session and start from the beginning
                 var properties = await blobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
                 var freshSession = DownloadSession.Create(
                     blobName: session.BlobName,
@@ -900,26 +914,22 @@ public class AzureStorageService : IStorageService
                 _logger.LogWarning("Local file size mismatch. Expected: {Expected}, Actual: {Actual} for file: {FilePath}",
                     session.DownloadedBytes, actualFileSize, session.LocalFilePath);
 
-                // If the file is smaller than expected, we can repair by updating the session
                 if (actualFileSize < session.TotalBytes)
                 {
                     _logger.LogDebug("Repairing download session with actual file size: {ActualSize}", actualFileSize);
                     return Task.FromResult<DownloadSession?>(session.UpdateProgress(actualFileSize));
                 }
 
-                // If file is larger than expected or total, we cannot safely resume
                 _logger.LogWarning("Cannot repair session - file is larger than expected");
                 return Task.FromResult<DownloadSession?>(null);
             }
 
-            // Additional validation: check if file was modified since session was last updated
             if (fileInfo.LastWriteTimeUtc > session.LastUpdatedAt.UtcDateTime.AddMinutes(1))
             {
                 _logger.LogWarning("Local file was modified after session was last updated. File: {FilePath}, " +
                     "File modified: {FileModified}, Session updated: {SessionUpdated}",
                     session.LocalFilePath, fileInfo.LastWriteTimeUtc, session.LastUpdatedAt.UtcDateTime);
                 
-                // Still attempt to repair if file size makes sense
                 if (actualFileSize < session.TotalBytes)
                 {
                     return Task.FromResult<DownloadSession?>(session.UpdateProgress(actualFileSize));
@@ -962,7 +972,7 @@ public class AzureStorageService : IStorageService
             {
                 if (attempt > 0)
                 {
-                    var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt - 1)); // Exponential backoff
+                    var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt - 1));
                     _logger.LogInformation("Retrying download attempt {Attempt} after {Delay}s delay", attempt + 1, delay.TotalSeconds);
                     await Task.Delay(delay, cancellationToken);
 
@@ -981,7 +991,6 @@ public class AzureStorageService : IStorageService
                     return result;
                 }
 
-                // If resumption is enabled and we have some data, update session for retry
                 if (options.EnableResumption && File.Exists(currentSession.LocalFilePath))
                 {
                     var fileInfo = new FileInfo(currentSession.LocalFilePath);
@@ -994,7 +1003,7 @@ public class AzureStorageService : IStorageService
 
                 if (attempt == options.MaxRetryAttempts)
                 {
-                    return result; // Return the failed result after max retries
+                    return result;
                 }
             }
             catch (OperationCanceledException)
@@ -1022,7 +1031,6 @@ public class AzureStorageService : IStorageService
             }
         }
 
-        // This should never be reached, but provides a fallback
         return new DownloadResult(
             BlobName: currentSession.BlobName,
             LocalFilePath: currentSession.LocalFilePath,
@@ -1047,7 +1055,6 @@ public class AzureStorageService : IStorageService
 
         try
         {
-            // Open or create the local file
             using var fileStream = startOffset > 0
                 ? new FileStream(path: session.LocalFilePath, mode: FileMode.Open, access: FileAccess.Write, share: FileShare.None)
                 : new FileStream(path: session.LocalFilePath, mode: FileMode.Create, access: FileAccess.Write, share: FileShare.None);
@@ -1057,19 +1064,16 @@ public class AzureStorageService : IStorageService
                 fileStream.Seek(startOffset, SeekOrigin.Begin);
             }
 
-            // Wrap with throttling stream if bandwidth limit is specified
             Stream targetStream = options.BandwidthLimitBytesPerSecond.HasValue
                 ? new ThrottledStream(fileStream, options.BandwidthLimitBytesPerSecond.Value)
                 : fileStream;
 
-            // Create progress tracking stream
             var progressStream = new ProgressTrackingStream(targetStream, totalBytes =>
             {
                 var now = DateTimeOffset.UtcNow;
                 var elapsed = now - lastProgressReport;
 
-                // Throttle progress reports to avoid spam
-                if (elapsed.TotalMilliseconds >= 250) // Report every 250ms
+                if (elapsed.TotalMilliseconds >= 250)
                 {
                     var currentBytes = startOffset + totalBytes;
                     var elapsedSinceStart = now - startTime;
@@ -1088,7 +1092,6 @@ public class AzureStorageService : IStorageService
                 }
             });
 
-            // Download the blob content with range if resuming
             if (startOffset > 0)
             {
                 var downloadOptions = new BlobDownloadOptions
@@ -1120,7 +1123,6 @@ public class AzureStorageService : IStorageService
         {
             _logger.LogError(ex, "Failed to download blob: {BlobName}", session.BlobName);
 
-            // Return current progress even on failure
             var currentBytes = File.Exists(session.LocalFilePath)
                 ? new FileInfo(session.LocalFilePath).Length
                 : 0;
