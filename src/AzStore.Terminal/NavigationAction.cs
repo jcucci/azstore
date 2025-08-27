@@ -18,5 +18,11 @@ public enum NavigationAction
     /// <summary>Show help</summary>
     Help,
     /// <summary>Enter command mode</summary>
-    Command
+    Command,
+    /// <summary>Jump to top of list (gg keys)</summary>
+    JumpToTop,
+    /// <summary>Jump to bottom of list (G key)</summary>
+    JumpToBottom,
+    /// <summary>Download selected item (dd keys)</summary>
+    Download
 }

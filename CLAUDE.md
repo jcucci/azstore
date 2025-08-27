@@ -8,7 +8,8 @@ azstore is a .NET 9 terminal application that provides a command-line REPL inter
 
 ## Key Requirements
 
-- Terminal-based REPL for Azure Blob Storage with VIM-like navigation (j/k/h/l keys)
+- Terminal-based REPL for Azure Blob Storage with VIM-like navigation (j/k/h/l keys, gg/G for jump navigation)
+- Multi-character key sequence support with configurable timeout for true VIM-like experience
 - Session-based workflow with Azure CLI authentication
 - File download with mirrored directory structure and conflict resolution
 - Cross-platform compatibility with TOML configuration support
@@ -158,8 +159,16 @@ Complete development environment setup:
 - **Test Coverage**: Updated all 156+ tests to use new paged API, added comprehensive paging tests
 - **REPL-Optimized**: Perfect for interactive scenarios where users navigate through containers/blobs page by page
 
+### ✅ Multi-Character Key Bindings Complete (Issue #40)
+- **KeySequenceBuffer**: Implements buffering system for multi-character key sequences like 'gg' and 'dd'
+- **Timeout Management**: Configurable timeout (default 1000ms) to distinguish intentional sequences from accidental key presses
+- **Prefix Matching**: Handles cases where one binding is a prefix of another (e.g., 'g' and 'gg')
+- **VIM-like Navigation**: True VIM-style bindings with 'gg' (jump to top), 'G' (jump to bottom), 'dd' (download)
+- **Backward Compatibility**: Existing single-character bindings continue to work unchanged
+- **Configuration Support**: Multi-character sequences and timeout configurable via TOML settings
+- **Comprehensive Testing**: 15+ unit tests covering timeout behavior, sequence completion, and prefix conflicts
+
 ### 🚧 In Development
-- VIM-like keyboard navigation
 - Session persistence
 - Interactive blob browser with paging navigation
 

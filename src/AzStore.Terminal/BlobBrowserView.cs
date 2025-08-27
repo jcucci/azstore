@@ -9,15 +9,18 @@ namespace AzStore.Terminal;
 public class BlobBrowserView : View
 {
     private static readonly string[] FileSizeSuffixes = ["B", "KB", "MB", "GB", "TB"];
-    
+
     private readonly ILogger<BlobBrowserView> _logger;
     private readonly KeyBindingsConfig _keyBindings;
+    private readonly KeySequenceBuffer _keySequenceBuffer;
+    private readonly Dictionary<KeyBindingAction, string> _bindingsLookup;
+    private readonly ObservableCollection<string> _displayItems = [];
+
     private ListView? _listView;
     private Label? _breadcrumbLabel;
     private Label? _statusLabel;
     private NavigationState? _currentState;
-    private ObservableCollection<string> _displayItems;
-    private IReadOnlyList<StorageItem> _currentItems;
+    private IReadOnlyList<StorageItem> _currentItems = [];
 
     public event EventHandler<NavigationResult>? NavigationRequested;
 
@@ -25,8 +28,21 @@ public class BlobBrowserView : View
     {
         _logger = logger;
         _keyBindings = keyBindings;
-        _displayItems = new ObservableCollection<string>();
-        _currentItems = Array.Empty<StorageItem>();
+        _keySequenceBuffer = new KeySequenceBuffer(_keyBindings.KeySequenceTimeout);
+
+        // Create reverse lookup dictionary for binding matching
+        _bindingsLookup = new Dictionary<KeyBindingAction, string>
+        {
+            { KeyBindingAction.MoveDown, _keyBindings.MoveDown },
+            { KeyBindingAction.MoveUp, _keyBindings.MoveUp },
+            { KeyBindingAction.Enter, _keyBindings.Enter },
+            { KeyBindingAction.Back, _keyBindings.Back },
+            { KeyBindingAction.Search, _keyBindings.Search },
+            { KeyBindingAction.Command, _keyBindings.Command },
+            { KeyBindingAction.Top, _keyBindings.Top },
+            { KeyBindingAction.Bottom, _keyBindings.Bottom },
+            { KeyBindingAction.Download, _keyBindings.Download }
+        };
 
         InitializeComponents();
         SetupKeyBindings();
@@ -83,21 +99,38 @@ public class BlobBrowserView : View
                 return;
             }
 
-            // Check configured key bindings (case-sensitive for VIM-like behavior)
-            var keyString = ((char)(uint)keyEvent).ToString();
-            
-            var action = keyString switch
-            {
-                _ when keyString == _keyBindings.MoveDown => (Action)(() => _listView.MoveDown()),
-                _ when keyString == _keyBindings.MoveUp => () => _listView.MoveUp(),
-                _ when keyString == _keyBindings.Enter => () => HandleItemSelection(),
-                _ when keyString == _keyBindings.Back => () => HandleBackNavigation(),
-                _ when keyString == _keyBindings.Search => () => HandleSearchRequest(),
-                _ when keyString == _keyBindings.Command => () => HandleCommandRequest(),
-                _ => null
-            };
+            // Convert key to character for sequence processing
+            var keyChar = (char)(uint)keyEvent;
 
-            action?.Invoke();
+            // Check if this key completes a binding sequence
+            var (isComplete, matchedBinding, hasPartialMatch) =
+                _keySequenceBuffer.AddKey(keyChar, _bindingsLookup);
+
+            if (isComplete && matchedBinding != null)
+            {
+                // Execute the matched binding
+                var action = matchedBinding switch
+                {
+                    KeyBindingAction.MoveDown => (Action)(() => _listView.MoveDown()),
+                    KeyBindingAction.MoveUp => () => _listView.MoveUp(),
+                    KeyBindingAction.Enter => () => HandleItemSelection(),
+                    KeyBindingAction.Back => () => HandleBackNavigation(),
+                    KeyBindingAction.Search => () => HandleSearchRequest(),
+                    KeyBindingAction.Command => () => HandleCommandRequest(),
+                    KeyBindingAction.Top => () => HandleJumpToTop(),
+                    KeyBindingAction.Bottom => () => HandleJumpToBottom(),
+                    KeyBindingAction.Download => () => HandleDownloadRequest(),
+                    _ => null
+                };
+
+                action?.Invoke();
+            }
+            else if (!hasPartialMatch)
+            {
+                // No match and no partial match - clear buffer and ignore key
+                _keySequenceBuffer.Clear();
+            }
+            // If hasPartialMatch is true, we keep the sequence for potential completion
         };
     }
 
@@ -152,7 +185,7 @@ public class BlobBrowserView : View
         var itemCount = _currentItems.Count;
         var selectedIndex = _listView?.SelectedItem ?? 0;
 
-        _statusLabel.Text = $"{level} | {itemCount} items | Selected: {selectedIndex + 1}/{itemCount} | j/k:nav l:enter h:back";
+        _statusLabel.Text = $"{level} | {itemCount} items | Selected: {selectedIndex + 1}/{itemCount} | j/k:nav l:enter h:back gg:top G:bottom dd:download";
     }
 
     private void HandleItemSelection()
@@ -193,6 +226,43 @@ public class BlobBrowserView : View
         NavigationRequested?.Invoke(this, result);
 
         _logger.LogDebug("Command mode requested");
+    }
+
+    private void HandleJumpToTop()
+    {
+        if (_listView != null && _currentItems.Count > 0)
+        {
+            _listView.SelectedItem = 0;
+            var result = new NavigationResult(NavigationAction.JumpToTop);
+            NavigationRequested?.Invoke(this, result);
+
+            _logger.LogDebug("Jump to top requested");
+        }
+    }
+
+    private void HandleJumpToBottom()
+    {
+        if (_listView != null && _currentItems.Count > 0)
+        {
+            _listView.SelectedItem = _currentItems.Count - 1;
+            var result = new NavigationResult(NavigationAction.JumpToBottom);
+            NavigationRequested?.Invoke(this, result);
+
+            _logger.LogDebug("Jump to bottom requested");
+        }
+    }
+
+    private void HandleDownloadRequest()
+    {
+        var selectedIndex = _listView?.SelectedItem ?? -1;
+        if (selectedIndex >= 0 && selectedIndex < _currentItems.Count)
+        {
+            var selectedItem = _currentItems[selectedIndex];
+            var result = new NavigationResult(NavigationAction.Download, selectedIndex, selectedItem);
+            NavigationRequested?.Invoke(this, result);
+
+            _logger.LogDebug("Download requested for: {ItemName} at index {Index}", selectedItem.Name, selectedIndex);
+        }
     }
 
     private static string FormatStorageItem(StorageItem item)
