@@ -88,6 +88,8 @@ public static class PathHelper
     /// <returns>A local path with proper directory separators.</returns>
     public static string ConvertBlobPathToLocalPath(string blobName)
     {
+        ArgumentNullException.ThrowIfNull(blobName);
+
         var pathComponents = blobName.Split('/', StringSplitOptions.RemoveEmptyEntries);
         var sanitizedComponents = pathComponents.Select(component => SanitizePathComponent(component)).ToArray();
 
@@ -152,6 +154,9 @@ public static class PathHelper
     /// <returns>Just the filename portion.</returns>
     public static string ExtractFilename(string blobName)
     {
+        if (blobName == null)
+            return string.Empty;
+
         var lastSlash = blobName.LastIndexOf('/');
         var filename = lastSlash >= 0 ? blobName[(lastSlash + 1)..] : blobName;
 
@@ -165,6 +170,9 @@ public static class PathHelper
     /// <returns>The virtual directory path, or null if none.</returns>
     public static string? ExtractVirtualDirectory(string blobName)
     {
+        if (blobName == null)
+            return null;
+
         var lastSlash = blobName.LastIndexOf('/');
         if (lastSlash <= 0)
             return null;

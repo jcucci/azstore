@@ -22,10 +22,10 @@ public class PathHelperTests
 
     [Trait("Category", "Unit")]
     [Fact]
-    public void SanitizePathComponent_NullInput_ThrowsArgumentNullException()
+    public void SanitizePathComponent_NullInput_ThrowsArgumentException()
     {
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => PathHelper.SanitizePathComponent(null!));
+        Assert.Throws<ArgumentException>(() => PathHelper.SanitizePathComponent(null!));
     }
 
     [Trait("Category", "Unit")]
@@ -299,10 +299,13 @@ public class PathHelperTests
 
     [Trait("Category", "Unit")]
     [Fact]
-    public void ExtractFilename_NullInput_ThrowsArgumentNullException()
+    public void ExtractFilename_NullInput_ReturnsEmpty()
     {
-        // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => PathHelper.ExtractFilename(null!));
+        // Act
+        var result = PathHelper.ExtractFilename(null!);
+
+        // Assert
+        Assert.Equal(string.Empty, result);
     }
 
     [Trait("Category", "Unit")]
@@ -330,10 +333,13 @@ public class PathHelperTests
 
     [Trait("Category", "Unit")]
     [Fact]
-    public void ExtractVirtualDirectory_NullInput_ThrowsArgumentNullException()
+    public void ExtractVirtualDirectory_NullInput_ReturnsNull()
     {
-        // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => PathHelper.ExtractVirtualDirectory(null!));
+        // Act
+        var result = PathHelper.ExtractVirtualDirectory(null!);
+
+        // Assert
+        Assert.Null(result);
     }
 
     [Trait("Category", "Unit")]

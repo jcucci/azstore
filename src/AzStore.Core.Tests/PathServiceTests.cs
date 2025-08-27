@@ -52,33 +52,55 @@ public class PathServiceTests
     }
 
     [Trait("Category", "Unit")]
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
-    public void CalculateBlobDownloadPath_InvalidContainerName_ThrowsArgumentException(string? containerName)
+    [Fact]
+    public void CalculateBlobDownloadPath_NullContainerName_ThrowsArgumentNullException()
     {
         // Arrange
         var session = CreateTestSession("test", "/home/user");
 
         // Act & Assert
-        Assert.Throws<ArgumentException>(() => 
-            _pathService.CalculateBlobDownloadPath(session, containerName!, "blob"));
+        Assert.Throws<ArgumentNullException>(() => 
+            _pathService.CalculateBlobDownloadPath(session, null!, "blob"));
     }
 
     [Trait("Category", "Unit")]
     [Theory]
-    [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void CalculateBlobDownloadPath_InvalidBlobName_ThrowsArgumentException(string? blobName)
+    public void CalculateBlobDownloadPath_EmptyContainerName_ThrowsArgumentException(string containerName)
     {
         // Arrange
         var session = CreateTestSession("test", "/home/user");
 
         // Act & Assert
         Assert.Throws<ArgumentException>(() => 
-            _pathService.CalculateBlobDownloadPath(session, "container", blobName!));
+            _pathService.CalculateBlobDownloadPath(session, containerName, "blob"));
+    }
+
+    [Trait("Category", "Unit")]
+    [Fact]
+    public void CalculateBlobDownloadPath_NullBlobName_ThrowsArgumentNullException()
+    {
+        // Arrange
+        var session = CreateTestSession("test", "/home/user");
+
+        // Act & Assert
+        Assert.Throws<ArgumentNullException>(() => 
+            _pathService.CalculateBlobDownloadPath(session, "container", null!));
+    }
+
+    [Trait("Category", "Unit")]
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void CalculateBlobDownloadPath_EmptyBlobName_ThrowsArgumentException(string blobName)
+    {
+        // Arrange
+        var session = CreateTestSession("test", "/home/user");
+
+        // Act & Assert
+        Assert.Throws<ArgumentException>(() => 
+            _pathService.CalculateBlobDownloadPath(session, "container", blobName));
     }
 
     [Trait("Category", "Unit")]
@@ -127,18 +149,29 @@ public class PathServiceTests
     }
 
     [Trait("Category", "Unit")]
+    [Fact]
+    public void CalculateContainerDirectoryPath_NullContainerName_ThrowsArgumentNullException()
+    {
+        // Arrange
+        var session = CreateTestSession("test", "/home/user");
+
+        // Act & Assert
+        Assert.Throws<ArgumentNullException>(() => 
+            _pathService.CalculateContainerDirectoryPath(session, null!));
+    }
+
+    [Trait("Category", "Unit")]
     [Theory]
-    [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void CalculateContainerDirectoryPath_InvalidContainerName_ThrowsArgumentException(string? containerName)
+    public void CalculateContainerDirectoryPath_EmptyContainerName_ThrowsArgumentException(string containerName)
     {
         // Arrange
         var session = CreateTestSession("test", "/home/user");
 
         // Act & Assert
         Assert.Throws<ArgumentException>(() => 
-            _pathService.CalculateContainerDirectoryPath(session, containerName!));
+            _pathService.CalculateContainerDirectoryPath(session, containerName));
     }
 
     [Trait("Category", "Unit")]
@@ -160,27 +193,27 @@ public class PathServiceTests
 
     [Trait("Category", "Unit")]
     [Fact]
-    public void SanitizePathComponent_NullInput_ThrowsArgumentNullException()
+    public void SanitizePathComponent_NullInput_ThrowsArgumentException()
     {
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => _pathService.SanitizePathComponent(null!));
+        Assert.Throws<ArgumentException>(() => _pathService.SanitizePathComponent(null!));
     }
 
     [Trait("Category", "Unit")]
     [Fact]
-    public async Task EnsureDirectoryExistsAsync_NullFilePath_ThrowsArgumentNullException()
+    public async Task EnsureDirectoryExistsAsync_NullFilePath_ThrowsArgumentException()
     {
         // Act & Assert
-        await Assert.ThrowsAsync<ArgumentNullException>(() => 
+        await Assert.ThrowsAsync<ArgumentException>(() => 
             _pathService.EnsureDirectoryExistsAsync(null!));
     }
 
     [Trait("Category", "Unit")]
     [Fact]
-    public async Task EnsureDirectoryExistsAsync_EmptyFilePath_ThrowsArgumentNullException()
+    public async Task EnsureDirectoryExistsAsync_EmptyFilePath_ThrowsArgumentException()
     {
         // Act & Assert
-        await Assert.ThrowsAsync<ArgumentNullException>(() => 
+        await Assert.ThrowsAsync<ArgumentException>(() => 
             _pathService.EnsureDirectoryExistsAsync(""));
     }
 

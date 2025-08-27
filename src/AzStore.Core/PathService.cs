@@ -24,6 +24,10 @@ public class PathService : IPathService
     /// <inheritdoc/>
     public string CalculateBlobDownloadPath(Session session, string containerName, string blobName)
     {
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentException.ThrowIfNullOrWhiteSpace(containerName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(blobName);
+
         _logger.LogDebug("Calculating blob download path for session: {SessionName}, container: {ContainerName}, blob: {BlobName}", session.Name, containerName, blobName);
 
         try
@@ -59,6 +63,9 @@ public class PathService : IPathService
     /// <inheritdoc/>
     public string CalculateContainerDirectoryPath(Session session, string containerName)
     {
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentException.ThrowIfNullOrWhiteSpace(containerName);
+
         _logger.LogDebug("Calculating container directory path for session: {SessionName}, container: {ContainerName}", session.Name, containerName);
 
         try
@@ -110,6 +117,12 @@ public class PathService : IPathService
     /// <inheritdoc/>
     public async Task<bool> EnsureDirectoryExistsAsync(string filePath, CancellationToken cancellationToken = default)
     {
+        if (string.IsNullOrEmpty(filePath))
+        {
+            _logger.LogError("filePath parameter is null or empty in EnsureDirectoryExistsAsync.");
+            throw new ArgumentException("filePath cannot be null or empty.", nameof(filePath));
+        }
+
         var directoryPath = Path.GetDirectoryName(filePath);
         if (string.IsNullOrEmpty(directoryPath))
         {
@@ -156,6 +169,11 @@ public class PathService : IPathService
     /// <inheritdoc/>
     public async Task<bool> CleanupEmptyDirectoriesAsync(string filePath, string sessionDirectory, CancellationToken cancellationToken = default)
     {
+        if (string.IsNullOrEmpty(filePath))
+            throw new ArgumentNullException(nameof(filePath), "filePath cannot be null or empty.");
+        if (string.IsNullOrEmpty(sessionDirectory))
+            throw new ArgumentNullException(nameof(sessionDirectory), "sessionDirectory cannot be null or empty.");
+
         _logger.LogDebug("Cleaning up empty directories from: {FilePath}, stopping at: {SessionDirectory}", filePath, sessionDirectory);
 
         bool IsDirectoryEmpty(string path)
@@ -227,7 +245,7 @@ public class PathService : IPathService
 
     /// <inheritdoc/>
     public string PreserveVirtualDirectoryStructure(string blobName) =>
-        blobName != null
+        !string.IsNullOrWhiteSpace(blobName)
             ? PathHelper.ConvertBlobPathToLocalPath(blobName)
-            : throw new ArgumentNullException(nameof(blobName));
+            : throw new ArgumentNullException(nameof(blobName), "blobName cannot be null, empty, or whitespace.");
 }
