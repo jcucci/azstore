@@ -39,7 +39,7 @@ public class KeySequenceBuffer
         {
             // Try to complete the current sequence before clearing it
             var timedOutMatch = bindings.FirstOrDefault(kvp => kvp.Value == _currentSequence).Key;
-            if (!timedOutMatch.Equals(default(KeyBindingAction)))
+            if (timedOutMatch != default(KeyBindingAction))
             {
                 _currentSequence = string.Empty;
                 return (true, timedOutMatch, false);
@@ -55,7 +55,7 @@ public class KeySequenceBuffer
             binding.StartsWith(_currentSequence, StringComparison.Ordinal));
 
         var matchedBinding = bindings.FirstOrDefault(kvp => kvp.Value == _currentSequence);
-        if (!matchedBinding.Equals(default(KeyValuePair<KeyBindingAction, string>)))
+        if (!string.IsNullOrEmpty(matchedBinding.Value))
         {
             // If there are partial matches, don't complete yet - wait for more input
             if (hasPartialMatch)
@@ -75,7 +75,7 @@ public class KeySequenceBuffer
 
             // Check if single key matches any binding
             var singleKeyMatch = bindings.FirstOrDefault(kvp => kvp.Value == key.ToString());
-            if (!singleKeyMatch.Equals(default(KeyValuePair<KeyBindingAction, string>)))
+            if (!string.IsNullOrEmpty(singleKeyMatch.Value))
             {
                 return (true, singleKeyMatch.Key, false);
             }
