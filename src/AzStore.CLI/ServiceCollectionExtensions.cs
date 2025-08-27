@@ -18,6 +18,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IAuthenticationService, AuthenticationService>();
         services.AddSingleton<IStorageService, AzureStorageService>();
         services.AddSingleton<IReplEngine, ReplEngine>();
+        services.AddSingleton<ITerminalUI, TerminalGuiUI>();
 
         services.AddTransient<ICommand, ExitCommand>();
         services.AddTransient<ICommand, HelpCommand>();

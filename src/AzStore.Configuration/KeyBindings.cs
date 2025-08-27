@@ -6,7 +6,9 @@ public class KeyBindings
     public string MoveUp { get; set; } = "k";
     public string Enter { get; set; } = "l";
     public string Back { get; set; } = "h";
-    public string Top { get; set; } = "gg";
+    public string Search { get; set; } = "/";
+    public string Command { get; set; } = ":";
+    public string Top { get; set; } = "t";
     public string Bottom { get; set; } = "G";
     public string Download { get; set; } = "d";
 }
