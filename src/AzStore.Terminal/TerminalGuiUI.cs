@@ -1,5 +1,7 @@
+using AzStore.Configuration;
 using AzStore.Core.Models;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Terminal.Gui;
 using System.Collections.ObjectModel;
 
@@ -13,13 +15,13 @@ public class TerminalGuiUI : ITerminalUI
     private bool _isRunning;
     private TaskCompletionSource<NavigationResult>? _currentNavigationTask;
 
-    public TerminalGuiUI(ILogger<TerminalGuiUI> logger, ILoggerFactory loggerFactory)
+    public TerminalGuiUI(ILogger<TerminalGuiUI> logger, ILoggerFactory loggerFactory, IOptions<AzStoreSettings> settings)
     {
         _logger = logger;
         _loggerFactory = loggerFactory;
         
         var browserLogger = _loggerFactory.CreateLogger<BlobBrowserView>();
-        _browserView = new BlobBrowserView(browserLogger);
+        _browserView = new BlobBrowserView(browserLogger, settings.Value.KeyBindings);
         _browserView.NavigationRequested += OnNavigationRequested;
     }
 
@@ -29,7 +31,7 @@ public class TerminalGuiUI : ITerminalUI
         _currentNavigationTask?.TrySetResult(result);
     }
 
-    public async Task RunAsync(CancellationToken cancellationToken = default)
+    public Task RunAsync(CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Starting Terminal.Gui application");
         
@@ -67,7 +69,7 @@ public class TerminalGuiUI : ITerminalUI
             _logger.LogInformation("Terminal.Gui application stopped");
         }
         
-        await Task.CompletedTask;
+        return Task.CompletedTask;
     }
 
     public async Task<NavigationResult> ShowStorageItemsAsync(

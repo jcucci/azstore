@@ -1,3 +1,4 @@
+using AzStore.Configuration;
 using AzStore.Core.Models;
 using AzStore.Terminal;
 using Microsoft.Extensions.Logging;
@@ -14,7 +15,8 @@ public class PerformanceTests
     public void BlobBrowserView_HandlesLargeItemLists_WithinPerformanceThreshold()
     {
         var logger = Substitute.For<ILogger<BlobBrowserView>>();
-        var view = new BlobBrowserView(logger);
+        var keyBindings = new KeyBindings();
+        var view = new BlobBrowserView(logger, keyBindings);
         
         var items = GenerateLargeItemList(1000);
         var navigationState = NavigationState.CreateInContainer("test-session", "storage-account", "container");
@@ -34,7 +36,8 @@ public class PerformanceTests
     public void BlobBrowserView_HandlesVeryLargeItemLists_WithinExtendedThreshold()
     {
         var logger = Substitute.For<ILogger<BlobBrowserView>>();
-        var view = new BlobBrowserView(logger);
+        var keyBindings = new KeyBindings();
+        var view = new BlobBrowserView(logger, keyBindings);
         
         var items = GenerateLargeItemList(5000);
         var navigationState = NavigationState.CreateInContainer("test-session", "storage-account", "container");
@@ -92,7 +95,8 @@ public class PerformanceTests
     public void BlobBrowserView_MemoryUsage_WithinReasonableLimits()
     {
         var logger = Substitute.For<ILogger<BlobBrowserView>>();
-        var view = new BlobBrowserView(logger);
+        var keyBindings = new KeyBindings();
+        var view = new BlobBrowserView(logger, keyBindings);
         
         var beforeMemory = GC.GetTotalMemory(true);
         
@@ -113,7 +117,8 @@ public class PerformanceTests
     public void BlobBrowserView_MultipleUpdates_Performance()
     {
         var logger = Substitute.For<ILogger<BlobBrowserView>>();
-        var view = new BlobBrowserView(logger);
+        var keyBindings = new KeyBindings();
+        var view = new BlobBrowserView(logger, keyBindings);
         
         var items = GenerateLargeItemList(500);
         var navigationState = NavigationState.CreateInContainer("test-session", "storage-account", "container");

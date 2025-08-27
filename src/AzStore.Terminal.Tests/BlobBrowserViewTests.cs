@@ -1,3 +1,4 @@
+using AzStore.Configuration;
 using AzStore.Core.Models;
 using AzStore.Terminal;
 using Microsoft.Extensions.Logging;
@@ -13,8 +14,9 @@ public class BlobBrowserViewTests
     public void BlobBrowserView_CanBeInstantiated()
     {
         var logger = Substitute.For<ILogger<BlobBrowserView>>();
+        var keyBindings = new KeyBindings();
         
-        var view = new BlobBrowserView(logger);
+        var view = new BlobBrowserView(logger, keyBindings);
         
         Assert.NotNull(view);
     }
@@ -23,7 +25,8 @@ public class BlobBrowserViewTests
     public void UpdateItems_UpdatesDisplayWithContainers()
     {
         var logger = Substitute.For<ILogger<BlobBrowserView>>();
-        var view = new BlobBrowserView(logger);
+        var keyBindings = new KeyBindings();
+        var view = new BlobBrowserView(logger, keyBindings);
         
         var containers = new List<StorageItem>
         {
@@ -43,7 +46,8 @@ public class BlobBrowserViewTests
     public void UpdateItems_UpdatesDisplayWithBlobs()
     {
         var logger = Substitute.For<ILogger<BlobBrowserView>>();
-        var view = new BlobBrowserView(logger);
+        var keyBindings = new KeyBindings();
+        var view = new BlobBrowserView(logger, keyBindings);
         
         var blobs = new List<StorageItem>
         {

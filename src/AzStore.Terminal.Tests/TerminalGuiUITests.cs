@@ -1,6 +1,8 @@
+using AzStore.Configuration;
 using AzStore.Core.Models;
 using AzStore.Terminal;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 using Xunit;
 
@@ -18,7 +20,10 @@ public class TerminalGuiUITests
         
         loggerFactory.CreateLogger<BlobBrowserView>().Returns(browserLogger);
         
-        var ui = new TerminalGuiUI(logger, loggerFactory);
+        var settings = Substitute.For<IOptions<AzStoreSettings>>();
+        settings.Value.Returns(new AzStoreSettings());
+        
+        var ui = new TerminalGuiUI(logger, loggerFactory, settings);
         
         Assert.NotNull(ui);
     }
@@ -32,7 +37,10 @@ public class TerminalGuiUITests
         
         loggerFactory.CreateLogger<BlobBrowserView>().Returns(browserLogger);
         
-        var ui = new TerminalGuiUI(logger, loggerFactory);
+        var settings = Substitute.For<IOptions<AzStoreSettings>>();
+        settings.Value.Returns(new AzStoreSettings());
+        
+        var ui = new TerminalGuiUI(logger, loggerFactory, settings);
         
         ui.ShowStatus("Test status message");
         
@@ -53,7 +61,10 @@ public class TerminalGuiUITests
         
         loggerFactory.CreateLogger<BlobBrowserView>().Returns(browserLogger);
         
-        var ui = new TerminalGuiUI(logger, loggerFactory);
+        var settings = Substitute.For<IOptions<AzStoreSettings>>();
+        settings.Value.Returns(new AzStoreSettings());
+        
+        var ui = new TerminalGuiUI(logger, loggerFactory, settings);
         
         ui.ShowError("Test error message");
         
@@ -74,7 +85,10 @@ public class TerminalGuiUITests
         
         loggerFactory.CreateLogger<BlobBrowserView>().Returns(browserLogger);
         
-        var ui = new TerminalGuiUI(logger, loggerFactory);
+        var settings = Substitute.For<IOptions<AzStoreSettings>>();
+        settings.Value.Returns(new AzStoreSettings());
+        
+        var ui = new TerminalGuiUI(logger, loggerFactory, settings);
         
         ui.ShowInfo("Test info message");
         
@@ -95,7 +109,10 @@ public class TerminalGuiUITests
         
         loggerFactory.CreateLogger<BlobBrowserView>().Returns(browserLogger);
         
-        var ui = new TerminalGuiUI(logger, loggerFactory);
+        var settings = Substitute.For<IOptions<AzStoreSettings>>();
+        settings.Value.Returns(new AzStoreSettings());
+        
+        var ui = new TerminalGuiUI(logger, loggerFactory, settings);
         
         ui.Shutdown();
         
@@ -117,7 +134,10 @@ public class TerminalGuiUITests
         
         loggerFactory.CreateLogger<BlobBrowserView>().Returns(browserLogger);
         
-        var ui = new TerminalGuiUI(logger, loggerFactory);
+        var settings = Substitute.For<IOptions<AzStoreSettings>>();
+        settings.Value.Returns(new AzStoreSettings());
+        
+        var ui = new TerminalGuiUI(logger, loggerFactory, settings);
         
         var items = new List<StorageItem>
         {
@@ -152,7 +172,10 @@ public class TerminalGuiUITests
         
         loggerFactory.CreateLogger<BlobBrowserView>().Returns(browserLogger);
         
-        var ui = new TerminalGuiUI(logger, loggerFactory);
+        var settings = Substitute.For<IOptions<AzStoreSettings>>();
+        settings.Value.Returns(new AzStoreSettings());
+        
+        var ui = new TerminalGuiUI(logger, loggerFactory, settings);
         
         var items = new List<StorageItem>
         {

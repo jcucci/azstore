@@ -2,12 +2,16 @@ using AzStore.Core.Models;
 using Microsoft.Extensions.Logging;
 using Terminal.Gui;
 using System.Collections.ObjectModel;
+using KeyBindingsConfig = AzStore.Configuration.KeyBindings;
 
 namespace AzStore.Terminal;
 
 public class BlobBrowserView : View
 {
+    private static readonly string[] FileSizeSuffixes = ["B", "KB", "MB", "GB", "TB"];
+    
     private readonly ILogger<BlobBrowserView> _logger;
+    private readonly KeyBindingsConfig _keyBindings;
     private ListView? _listView;
     private Label? _breadcrumbLabel;
     private Label? _statusLabel;
@@ -17,12 +21,13 @@ public class BlobBrowserView : View
 
     public event EventHandler<NavigationResult>? NavigationRequested;
 
-    public BlobBrowserView(ILogger<BlobBrowserView> logger)
+    public BlobBrowserView(ILogger<BlobBrowserView> logger, KeyBindingsConfig keyBindings)
     {
         _logger = logger;
+        _keyBindings = keyBindings;
         _displayItems = new ObservableCollection<string>();
         _currentItems = Array.Empty<StorageItem>();
-        
+
         InitializeComponents();
         SetupKeyBindings();
     }
@@ -60,7 +65,7 @@ public class BlobBrowserView : View
             Y = Pos.Bottom(this) - 1,
             Width = Dim.Fill(1),
             Height = 1,
-            Text = "j/k: navigate, l/Enter: select, h: back, /: search, :: command"
+            Text = $"{_keyBindings.MoveDown}/{_keyBindings.MoveUp}: navigate, {_keyBindings.Enter}/Enter: select, {_keyBindings.Back}: back, {_keyBindings.Search}: search, {_keyBindings.Command}: command"
         };
         Add(_statusLabel);
     }
@@ -71,30 +76,28 @@ public class BlobBrowserView : View
 
         _listView.KeyDown += (s, keyEvent) =>
         {
-            if (keyEvent == (Key)'j')
-            {
-                _listView.MoveDown();
-            }
-            else if (keyEvent == (Key)'k')
-            {
-                _listView.MoveUp();
-            }
-            else if (keyEvent == (Key)'l' || keyEvent == Key.Enter)
+            // Handle Enter key separately since it's a special Key enum value
+            if (keyEvent == Key.Enter)
             {
                 HandleItemSelection();
+                return;
             }
-            else if (keyEvent == (Key)'h')
+
+            // Check configured key bindings (case-sensitive for VIM-like behavior)
+            var keyString = ((char)(uint)keyEvent).ToString();
+            
+            var action = keyString switch
             {
-                HandleBackNavigation();
-            }
-            else if (keyEvent == (Key)'/')
-            {
-                HandleSearchRequest();
-            }
-            else if (keyEvent == (Key)':')
-            {
-                HandleCommandRequest();
-            }
+                _ when keyString == _keyBindings.MoveDown => (Action)(() => _listView.MoveDown()),
+                _ when keyString == _keyBindings.MoveUp => () => _listView.MoveUp(),
+                _ when keyString == _keyBindings.Enter => () => HandleItemSelection(),
+                _ when keyString == _keyBindings.Back => () => HandleBackNavigation(),
+                _ when keyString == _keyBindings.Search => () => HandleSearchRequest(),
+                _ when keyString == _keyBindings.Command => () => HandleCommandRequest(),
+                _ => null
+            };
+
+            action?.Invoke();
         };
     }
 
@@ -107,7 +110,7 @@ public class BlobBrowserView : View
         UpdateListDisplay();
         UpdateStatus();
 
-        _logger.LogDebug("Updated browser view with {ItemCount} items at {Level}", 
+        _logger.LogDebug("Updated browser view with {ItemCount} items at {Level}",
             items.Count, navigationState.GetLevel());
     }
 
@@ -160,7 +163,7 @@ public class BlobBrowserView : View
             var selectedItem = _currentItems[selectedIndex];
             var result = new NavigationResult(NavigationAction.Enter, selectedIndex, selectedItem);
             NavigationRequested?.Invoke(this, result);
-            
+
             _logger.LogDebug("Item selected: {ItemName} at index {Index}", selectedItem.Name, selectedIndex);
         }
     }
@@ -171,7 +174,7 @@ public class BlobBrowserView : View
         {
             var result = new NavigationResult(NavigationAction.Back);
             NavigationRequested?.Invoke(this, result);
-            
+
             _logger.LogDebug("Back navigation requested from {CurrentPath}", _currentState.BreadcrumbPath);
         }
     }
@@ -180,7 +183,7 @@ public class BlobBrowserView : View
     {
         var result = new NavigationResult(NavigationAction.Command, Command: "/");
         NavigationRequested?.Invoke(this, result);
-        
+
         _logger.LogDebug("Search requested");
     }
 
@@ -188,7 +191,7 @@ public class BlobBrowserView : View
     {
         var result = new NavigationResult(NavigationAction.Command, Command: ":");
         NavigationRequested?.Invoke(this, result);
-        
+
         _logger.LogDebug("Command mode requested");
     }
 
@@ -222,8 +225,7 @@ public class BlobBrowserView : View
     private static string FormatFileSize(long? bytes)
     {
         if (bytes == null || bytes == 0) return "";
-        
-        string[] suffixes = ["B", "KB", "MB", "GB", "TB"];
+
         var counter = 0;
         var number = (double)bytes.Value;
 
@@ -233,6 +235,6 @@ public class BlobBrowserView : View
             counter++;
         }
 
-        return $"{number:n1}{suffixes[counter]}";
+        return $"{number:n1}{FileSizeSuffixes[counter]}";
     }
 }
