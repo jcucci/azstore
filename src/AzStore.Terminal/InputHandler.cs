@@ -10,6 +10,8 @@ namespace AzStore.Terminal;
 /// </summary>
 public class InputHandler : IInputHandler
 {
+    private const int KeyRepeatThresholdMs = 100;
+
     private readonly ILogger<InputHandler> _logger;
     private readonly KeyBindingsConfig _keyBindings;
     private readonly KeySequenceBuffer _keySequenceBuffer;
@@ -58,7 +60,7 @@ public class InputHandler : IInputHandler
             {
                 // Same key pressed again - could be natural repeat or user holding
                 var timeSinceLastKey = (now - _lastKeyTime).TotalMilliseconds;
-                if (timeSinceLastKey < 100) // Very fast repeat, likely from holding key
+                if (timeSinceLastKey < KeyRepeatThresholdMs) // Very fast repeat, likely from holding key
                 {
                     return true; // Ignore rapid repeats, let timer handle them
                 }
@@ -114,6 +116,20 @@ public class InputHandler : IInputHandler
 
         // Convert key to character for sequence processing
         var keyChar = (char)(uint)keyEvent;
+        
+        // Terminal.Gui encodes A-Z keys as KeyCode.A-Z, but uses ShiftMask to distinguish case:
+        // - lowercase 'a'-'z': KeyCode.A-Z without ShiftMask
+        // - uppercase 'A'-'Z': KeyCode.A-Z with ShiftMask
+        // The cast to char always gives uppercase, so we need to check ShiftMask for the original case
+        if (keyChar >= 'A' && keyChar <= 'Z')
+        {
+            // Check if Shift is NOT pressed, meaning this was originally lowercase
+            if (!keyEvent.IsShift)
+            {
+                keyChar = char.ToLower(keyChar);
+            }
+            // If Shift IS pressed, keep as uppercase
+        }
 
         // Check if this key completes a binding sequence
         var (isComplete, matchedBinding, hasPartialMatch) =
@@ -225,6 +241,8 @@ public class InputHandler : IInputHandler
         }
 
         // Generate repeat key event
+        // Note: Using Task.Run to avoid recursive call on timer thread
+        // This may need refinement if Terminal.Gui requires UI thread synchronization
         Task.Run(() => ProcessKeyEvent(_lastRepeatingKey));
     }
 
