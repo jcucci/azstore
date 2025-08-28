@@ -42,11 +42,10 @@ public interface IPathService
     /// Handles permissions and provides detailed error information.
     /// </summary>
     /// <param name="filePath">The full file path whose directory structure should be created.</param>
-    /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>True if the directory structure exists or was created successfully; false otherwise.</returns>
     /// <exception cref="UnauthorizedAccessException">Thrown when lacking permissions to create directories.</exception>
     /// <exception cref="DirectoryServiceException">Thrown when directory creation fails for other reasons.</exception>
-    Task<bool> EnsureDirectoryExistsAsync(string filePath, CancellationToken cancellationToken = default);
+    bool EnsureDirectoryExists(string filePath);
 
     /// <summary>
     /// Cleans up empty directories in the path hierarchy up to the session directory.
@@ -54,9 +53,8 @@ public interface IPathService
     /// </summary>
     /// <param name="filePath">The file path whose parent directories should be cleaned up.</param>
     /// <param name="sessionDirectory">The session directory (cleanup stops here).</param>
-    /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>True if cleanup completed successfully; false if errors occurred.</returns>
-    Task<bool> CleanupEmptyDirectoriesAsync(string filePath, string sessionDirectory, CancellationToken cancellationToken = default);
+    bool CleanupEmptyDirectories(string filePath, string sessionDirectory);
 
     /// <summary>
     /// Validates that a path meets platform-specific requirements.

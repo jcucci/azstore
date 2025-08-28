@@ -201,31 +201,31 @@ public class PathServiceTests
 
     [Trait("Category", "Unit")]
     [Fact]
-    public async Task EnsureDirectoryExistsAsync_NullFilePath_ThrowsArgumentException()
+    public void EnsureDirectoryExists_NullFilePath_ThrowsArgumentException()
     {
         // Act & Assert
-        await Assert.ThrowsAsync<ArgumentException>(() => 
-            _pathService.EnsureDirectoryExistsAsync(null!));
+        Assert.Throws<ArgumentException>(() => 
+            _pathService.EnsureDirectoryExists(null!));
     }
 
     [Trait("Category", "Unit")]
     [Fact]
-    public async Task EnsureDirectoryExistsAsync_EmptyFilePath_ThrowsArgumentException()
+    public void EnsureDirectoryExists_EmptyFilePath_ThrowsArgumentException()
     {
         // Act & Assert
-        await Assert.ThrowsAsync<ArgumentException>(() => 
-            _pathService.EnsureDirectoryExistsAsync(""));
+        Assert.Throws<ArgumentException>(() => 
+            _pathService.EnsureDirectoryExists(""));
     }
 
     [Trait("Category", "Unit")]
     [Fact]
-    public async Task EnsureDirectoryExistsAsync_FilePathWithoutDirectory_ReturnsTrue()
+    public void EnsureDirectoryExists_FilePathWithoutDirectory_ReturnsTrue()
     {
         // Arrange
         var filePath = "file.txt"; // No directory component
 
         // Act
-        var result = await _pathService.EnsureDirectoryExistsAsync(filePath);
+        var result = _pathService.EnsureDirectoryExists(filePath);
 
         // Assert
         Assert.True(result);
@@ -233,14 +233,14 @@ public class PathServiceTests
 
     [Trait("Category", "Unit")]
     [Fact]
-    public async Task EnsureDirectoryExistsAsync_ExistingDirectory_ReturnsTrue()
+    public void EnsureDirectoryExists_ExistingDirectory_ReturnsTrue()
     {
         // Arrange
         var tempDir = Path.GetTempPath();
         var filePath = Path.Combine(tempDir, "file.txt");
 
         // Act
-        var result = await _pathService.EnsureDirectoryExistsAsync(filePath);
+        var result = _pathService.EnsureDirectoryExists(filePath);
 
         // Assert
         Assert.True(result);
@@ -248,7 +248,7 @@ public class PathServiceTests
 
     [Trait("Category", "Unit")]
     [Fact]
-    public async Task EnsureDirectoryExistsAsync_NewDirectory_CreatesDirectoryAndReturnsTrue()
+    public void EnsureDirectoryExists_NewDirectory_CreatesDirectoryAndReturnsTrue()
     {
         // Arrange
         var tempDir = Path.GetTempPath();
@@ -258,7 +258,7 @@ public class PathServiceTests
         try
         {
             // Act
-            var result = await _pathService.EnsureDirectoryExistsAsync(filePath);
+            var result = _pathService.EnsureDirectoryExists(filePath);
 
             // Assert
             Assert.True(result);
@@ -276,25 +276,25 @@ public class PathServiceTests
 
     [Trait("Category", "Unit")]
     [Fact]
-    public async Task CleanupEmptyDirectoriesAsync_NullFilePath_ThrowsArgumentNullException()
+    public void CleanupEmptyDirectories_NullFilePath_ThrowsArgumentNullException()
     {
         // Act & Assert
-        await Assert.ThrowsAsync<ArgumentNullException>(() => 
-            _pathService.CleanupEmptyDirectoriesAsync(null!, "/session"));
+        Assert.Throws<ArgumentNullException>(() => 
+            _pathService.CleanupEmptyDirectories(null!, "/session"));
     }
 
     [Trait("Category", "Unit")]
     [Fact]
-    public async Task CleanupEmptyDirectoriesAsync_NullSessionDirectory_ThrowsArgumentNullException()
+    public void CleanupEmptyDirectories_NullSessionDirectory_ThrowsArgumentNullException()
     {
         // Act & Assert
-        await Assert.ThrowsAsync<ArgumentNullException>(() => 
-            _pathService.CleanupEmptyDirectoriesAsync("/path/file.txt", null!));
+        Assert.Throws<ArgumentNullException>(() => 
+            _pathService.CleanupEmptyDirectories("/path/file.txt", null!));
     }
 
     [Trait("Category", "Unit")]
     [Fact]
-    public async Task CleanupEmptyDirectoriesAsync_EmptyDirectories_RemovesEmptyDirs()
+    public void CleanupEmptyDirectories_EmptyDirectories_RemovesEmptyDirs()
     {
         // Arrange
         var tempDir = Path.GetTempPath();
@@ -309,7 +309,7 @@ public class PathServiceTests
             Directory.CreateDirectory(subDir2);
             
             // Act
-            var result = await _pathService.CleanupEmptyDirectoriesAsync(filePath, sessionDir);
+            var result = _pathService.CleanupEmptyDirectories(filePath, sessionDir);
 
             // Assert
             Assert.True(result);
@@ -329,7 +329,7 @@ public class PathServiceTests
 
     [Trait("Category", "Unit")]
     [Fact]
-    public async Task CleanupEmptyDirectoriesAsync_DirectoryWithFiles_StopsCleanup()
+    public void CleanupEmptyDirectories_DirectoryWithFiles_StopsCleanup()
     {
         // Arrange
         var tempDir = Path.GetTempPath();
@@ -346,7 +346,7 @@ public class PathServiceTests
             File.WriteAllText(keepFile, "test content");
 
             // Act
-            var result = await _pathService.CleanupEmptyDirectoriesAsync(filePath, sessionDir);
+            var result = _pathService.CleanupEmptyDirectories(filePath, sessionDir);
 
             // Assert
             Assert.True(result);
@@ -428,37 +428,6 @@ public class PathServiceTests
         Assert.Equal("file.txt", result);
     }
 
-    [Trait("Category", "Unit")]
-    [Fact]
-    public async Task EnsureDirectoryExistsAsync_WithCancellation_ThrowsOperationCanceledException()
-    {
-        // Arrange
-        var cancellationTokenSource = new CancellationTokenSource();
-        cancellationTokenSource.Cancel();
-        
-        var tempDir = Path.GetTempPath();
-        var newDir = Path.Combine(tempDir, Guid.NewGuid().ToString());
-        var filePath = Path.Combine(newDir, "file.txt");
-
-        // Act & Assert
-        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => 
-            _pathService.EnsureDirectoryExistsAsync(filePath, cancellationTokenSource.Token));
-        Assert.True(exception is OperationCanceledException);
-    }
-
-    [Trait("Category", "Unit")]
-    [Fact]
-    public async Task CleanupEmptyDirectoriesAsync_WithCancellation_ThrowsOperationCanceledException()
-    {
-        // Arrange
-        var cancellationTokenSource = new CancellationTokenSource();
-        cancellationTokenSource.Cancel();
-
-        // Act & Assert
-        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => 
-            _pathService.CleanupEmptyDirectoriesAsync("/path/file.txt", "/session", cancellationTokenSource.Token));
-        Assert.True(exception is OperationCanceledException);
-    }
 
     private static Session CreateTestSession(string name, string directory)
     {

@@ -115,11 +115,11 @@ public class PathService : IPathService
     }
 
     /// <inheritdoc/>
-    public async Task<bool> EnsureDirectoryExistsAsync(string filePath, CancellationToken cancellationToken = default)
+    public bool EnsureDirectoryExists(string filePath)
     {
         if (string.IsNullOrEmpty(filePath))
         {
-            _logger.LogError("filePath parameter is null or empty in EnsureDirectoryExistsAsync.");
+            _logger.LogError("filePath parameter is null or empty in EnsureDirectoryExists.");
             throw new ArgumentException("filePath cannot be null or empty.", nameof(filePath));
         }
 
@@ -140,19 +140,10 @@ public class PathService : IPathService
                 return true;
             }
 
-            await Task.Run(() =>
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                Directory.CreateDirectory(directoryPath);
-            }, cancellationToken);
+            Directory.CreateDirectory(directoryPath);
 
             _logger.LogDebug("Successfully created directory: {DirectoryPath}", directoryPath);
             return true;
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogDebug("Directory creation cancelled for: {DirectoryPath}", directoryPath);
-            throw;
         }
         catch (UnauthorizedAccessException ex)
         {
@@ -167,7 +158,7 @@ public class PathService : IPathService
     }
 
     /// <inheritdoc/>
-    public async Task<bool> CleanupEmptyDirectoriesAsync(string filePath, string sessionDirectory, CancellationToken cancellationToken = default)
+    public bool CleanupEmptyDirectories(string filePath, string sessionDirectory)
     {
         if (string.IsNullOrEmpty(filePath))
             throw new ArgumentNullException(nameof(filePath), "filePath cannot be null or empty.");
@@ -178,13 +169,11 @@ public class PathService : IPathService
 
         bool IsDirectoryEmpty(string path)
         {
-            cancellationToken.ThrowIfCancellationRequested();
             return !Directory.EnumerateFileSystemEntries(path).Any();
         }
 
         void DeleteDirectory(string path)
         {
-            cancellationToken.ThrowIfCancellationRequested();
             Directory.Delete(path);
         }
 
@@ -195,8 +184,6 @@ public class PathService : IPathService
 
             while (!string.IsNullOrEmpty(currentDirectory))
             {
-                cancellationToken.ThrowIfCancellationRequested();
-
                 var currentFullPath = Path.GetFullPath(currentDirectory);
 
                 if (string.Equals(currentFullPath, stopDirectory, StringComparison.OrdinalIgnoreCase) || !currentFullPath.StartsWith(stopDirectory, StringComparison.OrdinalIgnoreCase))
@@ -207,10 +194,10 @@ public class PathService : IPathService
 
                 if (Directory.Exists(currentFullPath))
                 {
-                    var isEmpty = await Task.Run(() => IsDirectoryEmpty(currentFullPath), cancellationToken);
+                    var isEmpty = IsDirectoryEmpty(currentFullPath);
                     if (isEmpty)
                     {
-                        await Task.Run(() => DeleteDirectory(currentFullPath), cancellationToken);
+                        DeleteDirectory(currentFullPath);
                         _logger.LogDebug("Deleted empty directory: {Directory}", currentFullPath);
                     }
                     else
@@ -224,11 +211,6 @@ public class PathService : IPathService
             }
 
             return true;
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogDebug("Directory cleanup cancelled");
-            throw;
         }
         catch (Exception ex)
         {

@@ -25,17 +25,15 @@ public interface ISessionManager
     /// Gets an existing session by name.
     /// </summary>
     /// <param name="name">The name of the session to retrieve.</param>
-    /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>The session with the specified name, or null if not found.</returns>
     /// <exception cref="ArgumentException">Thrown when name is null or empty.</exception>
-    Task<Session?> GetSessionAsync(string name, CancellationToken cancellationToken = default);
+    Session? GetSession(string name);
 
     /// <summary>
     /// Gets all existing sessions.
     /// </summary>
-    /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>A collection of all existing sessions.</returns>
-    Task<IEnumerable<Session>> GetAllSessionsAsync(CancellationToken cancellationToken = default);
+    IEnumerable<Session> GetAllSessions();
 
     /// <summary>
     /// Updates an existing session with new information.
@@ -60,22 +58,19 @@ public interface ISessionManager
     /// Sets the active session for the current application instance.
     /// </summary>
     /// <param name="session">The session to set as active.</param>
-    /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <exception cref="ArgumentNullException">Thrown when session is null.</exception>
-    Task SetActiveSessionAsync(Session session, CancellationToken cancellationToken = default);
+    void SetActiveSession(Session session);
 
     /// <summary>
     /// Gets the currently active session.
     /// </summary>
-    /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>The currently active session, or null if no session is active.</returns>
-    Task<Session?> GetActiveSessionAsync(CancellationToken cancellationToken = default);
+    Session? GetActiveSession();
 
     /// <summary>
     /// Clears the currently active session.
     /// </summary>
-    /// <param name="cancellationToken">A token to cancel the operation.</param>
-    Task ClearActiveSessionAsync(CancellationToken cancellationToken = default);
+    void ClearActiveSession();
 
     /// <summary>
     /// Updates the last accessed timestamp for the specified session.
@@ -91,10 +86,9 @@ public interface ISessionManager
     /// </summary>
     /// <param name="session">The session to validate.</param>
     /// <param name="createIfMissing">Whether to create the directory if it doesn't exist.</param>
-    /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>true if the directory is valid and accessible; otherwise, false.</returns>
     /// <exception cref="ArgumentNullException">Thrown when session is null.</exception>
-    Task<bool> ValidateSessionDirectoryAsync(Session session, bool createIfMissing = false, CancellationToken cancellationToken = default);
+    bool ValidateSessionDirectory(Session session, bool createIfMissing = false);
 
     /// <summary>
     /// Persists session data to storage (typically called automatically by other methods).

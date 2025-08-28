@@ -70,7 +70,7 @@ public class DownloadCommand : ICommand
     {
         _logger.LogInformation("Downloading {BlobName} from {ContainerName}", blobName, containerName);
 
-        var targetPath = await CalculateTargetPathAsync(containerName, blobName, localPath, cancellationToken);
+        var targetPath = CalculateTargetPath(containerName, blobName, localPath);
 
         var progress = new Progress<BlobDownloadProgress>(DisplayProgress);
 
@@ -223,13 +223,11 @@ public class DownloadCommand : ICommand
     /// <summary>
     /// Calculates the target path for a blob download, using session-aware paths when appropriate.
     /// </summary>
-    private async Task<string> CalculateTargetPathAsync(string containerName, string blobName, string userSpecifiedPath, CancellationToken cancellationToken)
+    private string CalculateTargetPath(string containerName, string blobName, string userSpecifiedPath)
     {
         if (userSpecifiedPath == "." || Directory.Exists(userSpecifiedPath) || userSpecifiedPath.EndsWith(Path.DirectorySeparatorChar))
         {
-            var session = _sessionManager != null
-                ? await _sessionManager.GetActiveSessionAsync(cancellationToken)
-                : null;
+            var session = _sessionManager?.GetActiveSession();
 
             if (session != null)
             {
