@@ -12,8 +12,7 @@ public class BlobBrowserView : View
 
     private readonly ILogger<BlobBrowserView> _logger;
     private readonly KeyBindingsConfig _keyBindings;
-    private readonly KeySequenceBuffer _keySequenceBuffer;
-    private readonly Dictionary<KeyBindingAction, string> _bindingsLookup;
+    private readonly IInputHandler _inputHandler;
     private readonly ObservableCollection<string> _displayItems = [];
 
     private ListView? _listView;
@@ -24,25 +23,14 @@ public class BlobBrowserView : View
 
     public event EventHandler<NavigationResult>? NavigationRequested;
 
-    public BlobBrowserView(ILogger<BlobBrowserView> logger, KeyBindingsConfig keyBindings)
+    public BlobBrowserView(ILogger<BlobBrowserView> logger, KeyBindingsConfig keyBindings, IInputHandler inputHandler)
     {
         _logger = logger;
         _keyBindings = keyBindings;
-        _keySequenceBuffer = new KeySequenceBuffer(_keyBindings.KeySequenceTimeout);
+        _inputHandler = inputHandler;
 
-        // Create reverse lookup dictionary for binding matching
-        _bindingsLookup = new Dictionary<KeyBindingAction, string>
-        {
-            { KeyBindingAction.MoveDown, _keyBindings.MoveDown },
-            { KeyBindingAction.MoveUp, _keyBindings.MoveUp },
-            { KeyBindingAction.Enter, _keyBindings.Enter },
-            { KeyBindingAction.Back, _keyBindings.Back },
-            { KeyBindingAction.Search, _keyBindings.Search },
-            { KeyBindingAction.Command, _keyBindings.Command },
-            { KeyBindingAction.Top, _keyBindings.Top },
-            { KeyBindingAction.Bottom, _keyBindings.Bottom },
-            { KeyBindingAction.Download, _keyBindings.Download }
-        };
+        // Subscribe to input handler events
+        _inputHandler.NavigationRequested += OnNavigationRequested;
 
         InitializeComponents();
         SetupKeyBindings();
@@ -92,46 +80,53 @@ public class BlobBrowserView : View
 
         _listView.KeyDown += (s, keyEvent) =>
         {
-            // Handle Enter key separately since it's a special Key enum value
-            if (keyEvent == Key.Enter)
-            {
+            // Delegate all key processing to the input handler
+            _inputHandler.ProcessKeyEvent(keyEvent);
+        };
+    }
+
+    private void OnNavigationRequested(object? sender, NavigationResult result)
+    {
+        // Handle navigation actions that affect the view directly
+        switch (result.Action)
+        {
+            case NavigationAction.Enter when result.KeyBindingAction == KeyBindingAction.MoveDown:
+                _listView?.MoveDown();
+                return;
+            case NavigationAction.Enter when result.KeyBindingAction == KeyBindingAction.MoveUp:
+                _listView?.MoveUp();
+                return;
+            case NavigationAction.Enter when result.KeyBindingAction == KeyBindingAction.Enter:
                 HandleItemSelection();
                 return;
-            }
+            case NavigationAction.Enter when result.KeyBindingAction == null:
+                HandleItemSelection();
+                return;
+            case NavigationAction.Back:
+                HandleBackNavigation();
+                return;
+            case NavigationAction.JumpToTop:
+                HandleJumpToTop();
+                return;
+            case NavigationAction.JumpToBottom:
+                HandleJumpToBottom();
+                return;
+            case NavigationAction.Download:
+                HandleDownloadRequest();
+                return;
+            case NavigationAction.Command when result.Command == "/":
+                HandleSearchRequest();
+                return;
+            case NavigationAction.Command when result.Command == ":":
+                HandleCommandRequest();
+                return;
+            case NavigationAction.Cancel:
+                // Clear any visual state if needed
+                return;
+        }
 
-            // Convert key to character for sequence processing
-            var keyChar = (char)(uint)keyEvent;
-
-            // Check if this key completes a binding sequence
-            var (isComplete, matchedBinding, hasPartialMatch) =
-                _keySequenceBuffer.AddKey(keyChar, _bindingsLookup);
-
-            if (isComplete && matchedBinding != null)
-            {
-                // Execute the matched binding
-                var action = matchedBinding switch
-                {
-                    KeyBindingAction.MoveDown => (Action)(() => _listView.MoveDown()),
-                    KeyBindingAction.MoveUp => () => _listView.MoveUp(),
-                    KeyBindingAction.Enter => () => HandleItemSelection(),
-                    KeyBindingAction.Back => () => HandleBackNavigation(),
-                    KeyBindingAction.Search => () => HandleSearchRequest(),
-                    KeyBindingAction.Command => () => HandleCommandRequest(),
-                    KeyBindingAction.Top => () => HandleJumpToTop(),
-                    KeyBindingAction.Bottom => () => HandleJumpToBottom(),
-                    KeyBindingAction.Download => () => HandleDownloadRequest(),
-                    _ => null
-                };
-
-                action?.Invoke();
-            }
-            else if (!hasPartialMatch)
-            {
-                // No match and no partial match - clear buffer and ignore key
-                _keySequenceBuffer.Clear();
-            }
-            // If hasPartialMatch is true, we keep the sequence for potential completion
-        };
+        // Forward all navigation requests to parent
+        NavigationRequested?.Invoke(this, result);
     }
 
     public void UpdateItems(IReadOnlyList<StorageItem> items, NavigationState navigationState)
@@ -264,6 +259,7 @@ public class BlobBrowserView : View
             _logger.LogDebug("Download requested for: {ItemName} at index {Index}", selectedItem.Name, selectedIndex);
         }
     }
+
 
     private static string FormatStorageItem(StorageItem item)
     {

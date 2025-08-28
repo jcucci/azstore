@@ -17,4 +17,14 @@ public class KeyBindings
     /// If keys are typed slower than this, they are treated as separate commands.
     /// </summary>
     public int KeySequenceTimeout { get; set; } = 1000;
+    
+    /// <summary>
+    /// Initial delay in milliseconds before key repeat starts when a key is held down.
+    /// </summary>
+    public int KeyRepeatDelay { get; set; } = 500;
+    
+    /// <summary>
+    /// Interval in milliseconds between key repeat events once repeat has started.
+    /// </summary>
+    public int KeyRepeatInterval { get; set; } = 50;
 }

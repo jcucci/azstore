@@ -15,8 +15,9 @@ public class BlobBrowserViewTests
     {
         var logger = Substitute.For<ILogger<BlobBrowserView>>();
         var keyBindings = new KeyBindings();
+        var inputHandler = Substitute.For<IInputHandler>();
         
-        var view = new BlobBrowserView(logger, keyBindings);
+        var view = new BlobBrowserView(logger, keyBindings, inputHandler);
         
         Assert.NotNull(view);
     }
@@ -26,7 +27,8 @@ public class BlobBrowserViewTests
     {
         var logger = Substitute.For<ILogger<BlobBrowserView>>();
         var keyBindings = new KeyBindings();
-        var view = new BlobBrowserView(logger, keyBindings);
+        var inputHandler = Substitute.For<IInputHandler>();
+        var view = new BlobBrowserView(logger, keyBindings, inputHandler);
         
         var containers = new List<StorageItem>
         {
@@ -47,7 +49,8 @@ public class BlobBrowserViewTests
     {
         var logger = Substitute.For<ILogger<BlobBrowserView>>();
         var keyBindings = new KeyBindings();
-        var view = new BlobBrowserView(logger, keyBindings);
+        var inputHandler = Substitute.For<IInputHandler>();
+        var view = new BlobBrowserView(logger, keyBindings, inputHandler);
         
         var blobs = new List<StorageItem>
         {
@@ -169,8 +172,9 @@ public class BlobBrowserViewTests
             Download = "dd",
             KeySequenceTimeout = 500
         };
+        var inputHandler = Substitute.For<IInputHandler>();
         
-        var view = new BlobBrowserView(logger, keyBindings);
+        var view = new BlobBrowserView(logger, keyBindings, inputHandler);
         
         // Test passes if no exception is thrown during instantiation
         Assert.NotNull(view);
@@ -181,7 +185,8 @@ public class BlobBrowserViewTests
     {
         var logger = Substitute.For<ILogger<BlobBrowserView>>();
         var keyBindings = new KeyBindings();
-        var view = new BlobBrowserView(logger, keyBindings);
+        var inputHandler = Substitute.For<IInputHandler>();
+        var view = new BlobBrowserView(logger, keyBindings, inputHandler);
         
         bool eventFired = false;
         NavigationResult? receivedResult = null;

@@ -9,5 +9,6 @@ public record NavigationResult(
     NavigationAction Action,
     int? SelectedIndex = null,
     StorageItem? SelectedItem = null,
-    string? Command = null
+    string? Command = null,
+    KeyBindingAction? KeyBindingAction = null
 );

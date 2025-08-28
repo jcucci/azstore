@@ -3,6 +3,8 @@ using AzStore.Core;
 using AzStore.Terminal;
 using AzStore.Terminal.Commands;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace AzStore.CLI;
 
@@ -18,6 +20,12 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IAuthenticationService, AuthenticationService>();
         services.AddSingleton<IStorageService, AzureStorageService>();
         services.AddSingleton<IReplEngine, ReplEngine>();
+        services.AddSingleton<IInputHandler>(provider =>
+        {
+            var logger = provider.GetRequiredService<ILogger<InputHandler>>();
+            var settings = provider.GetRequiredService<IOptions<AzStoreSettings>>();
+            return new InputHandler(logger, settings.Value.KeyBindings);
+        });
         services.AddSingleton<ITerminalUI, TerminalGuiUI>();
 
         services.AddTransient<ICommand, ExitCommand>();
