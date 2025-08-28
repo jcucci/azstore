@@ -101,4 +101,28 @@ public interface ISessionManager
     /// </summary>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     Task LoadSessionsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Cleans up old sessions that have not been accessed within the specified time period.
+    /// </summary>
+    /// <param name="maxAge">The maximum age of sessions to keep. Sessions older than this will be removed.</param>
+    /// <param name="deleteDirectories">Whether to delete the session directories along with session metadata.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A tuple containing the number of sessions removed and the number of directories deleted.</returns>
+    /// <exception cref="ArgumentException">Thrown when maxAge is negative.</exception>
+    Task<(int SessionsRemoved, int DirectoriesDeleted)> CleanupOldSessionsAsync(TimeSpan maxAge, bool deleteDirectories = false, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets statistics about session storage usage and age distribution.
+    /// </summary>
+    /// <returns>Statistics about the current session collection.</returns>
+    SessionStatistics GetSessionStatistics();
+
+    /// <summary>
+    /// Validates all stored sessions and removes any that have invalid configurations.
+    /// </summary>
+    /// <param name="fixDirectories">Whether to attempt to recreate missing session directories.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>The number of sessions that were removed due to validation failures.</returns>
+    Task<int> ValidateAndCleanupSessionsAsync(bool fixDirectories = false, CancellationToken cancellationToken = default);
 }

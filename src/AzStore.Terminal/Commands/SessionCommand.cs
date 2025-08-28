@@ -53,6 +53,9 @@ public class SessionCommand : ICommand
             "switch" => await SwitchSessionAsync(args.Skip(1).ToArray(), cancellationToken),
             "delete" => await DeleteSessionAsync(args.Skip(1).ToArray(), cancellationToken),
             "current" => ShowCurrentSession(),
+            "cleanup" => await CleanupSessionsAsync(args.Skip(1).ToArray(), cancellationToken),
+            "stats" => ShowSessionStatistics(),
+            "validate" => await ValidateSessionsAsync(args.Skip(1).ToArray(), cancellationToken),
             "help" => ShowUsage(),
             _ => CommandResult.Error($"Unknown session subcommand: {subcommand}. Use :session help for usage.")
         };
@@ -241,6 +244,81 @@ public class SessionCommand : ICommand
         }
     }
 
+    private async Task<CommandResult> CleanupSessionsAsync(string[] args, CancellationToken cancellationToken)
+    {
+        if (args.Length == 0)
+        {
+            return CommandResult.Error("Usage: :session cleanup <days> [--delete-dirs]");
+        }
+
+        if (!int.TryParse(args[0], out var days) || days < 0)
+        {
+            return CommandResult.Error("Invalid number of days. Please provide a non-negative integer.");
+        }
+
+        var deleteDirectories = args.Contains("--delete-dirs", StringComparer.OrdinalIgnoreCase);
+        var maxAge = TimeSpan.FromDays(days);
+
+        try
+        {
+            _logger.LogInformation("Starting session cleanup: sessions older than {Days} days", days);
+
+            var (sessionsRemoved, directoriesDeleted) = await _sessionManager.CleanupOldSessionsAsync(maxAge, deleteDirectories, cancellationToken);
+
+            var message = $"Cleanup completed: {sessionsRemoved} sessions removed";
+            if (deleteDirectories)
+            {
+                message += $", {directoriesDeleted} directories deleted";
+            }
+
+            return CommandResult.Ok(message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to cleanup sessions");
+            return CommandResult.Error($"Failed to cleanup sessions: {ex.Message}");
+        }
+    }
+
+    private CommandResult ShowSessionStatistics()
+    {
+        try
+        {
+            var stats = _sessionManager.GetSessionStatistics();
+            return CommandResult.Ok(stats.ToString());
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get session statistics");
+            return CommandResult.Error($"Failed to get session statistics: {ex.Message}");
+        }
+    }
+
+    private async Task<CommandResult> ValidateSessionsAsync(string[] args, CancellationToken cancellationToken)
+    {
+        var fixDirectories = args.Contains("--fix-dirs", StringComparer.OrdinalIgnoreCase);
+
+        try
+        {
+            _logger.LogInformation("Starting session validation");
+
+            var invalidCount = await _sessionManager.ValidateAndCleanupSessionsAsync(fixDirectories, cancellationToken);
+
+            var message = $"Validation completed: {invalidCount} invalid sessions removed";
+            if (fixDirectories)
+            {
+                message += " (missing directories were recreated where possible)";
+            }
+
+            return CommandResult.Ok(message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to validate sessions");
+            return CommandResult.Error($"Failed to validate sessions: {ex.Message}");
+        }
+    }
+
     private CommandResult ShowUsage()
     {
         var usage = """
@@ -261,6 +339,17 @@ Session Management Commands:
 :session current
     Show details of the current active session
 
+:session cleanup <days> [--delete-dirs]
+    Clean up sessions not accessed within the specified number of days
+    Use --delete-dirs to also delete session directories
+
+:session stats
+    Show statistics about session usage and storage
+
+:session validate [--fix-dirs]
+    Validate all sessions and remove invalid ones
+    Use --fix-dirs to recreate missing directories
+
 :session help
     Show this help message
 
@@ -268,6 +357,10 @@ Examples:
   :session create myapp /home/user/downloads myappstore
   :session switch myapp
   :session list
+  :session cleanup 30
+  :session cleanup 7 --delete-dirs
+  :session stats
+  :session validate --fix-dirs
 """;
 
         return CommandResult.Ok(usage);
