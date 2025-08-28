@@ -39,12 +39,16 @@ public class SessionManager : ISessionManager
         ArgumentException.ThrowIfNullOrWhiteSpace(directory);
         ArgumentException.ThrowIfNullOrWhiteSpace(storageAccountName);
 
+        if (name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+            throw new ArgumentException($"Session name contains invalid characters: {name}", nameof(name));
+
+        if (!IsValidStorageAccountName(storageAccountName))
+            throw new ArgumentException($"Storage account name is invalid. Must be 3-24 characters, lowercase letters and numbers only: {storageAccountName}", nameof(storageAccountName));
+
         _logger.LogInformation("Creating session: {SessionName} for storage account: {StorageAccount}", name, storageAccountName);
 
         if (_sessions.ContainsKey(name))
-        {
             throw new InvalidOperationException($"Session '{name}' already exists");
-        }
 
         var fullPath = Path.GetFullPath(directory);
         if (!Directory.Exists(fullPath))
@@ -84,10 +88,7 @@ public class SessionManager : ISessionManager
     }
 
     /// <inheritdoc/>
-    public IEnumerable<Session> GetAllSessions()
-    {
-        return _sessions.Values.ToList();
-    }
+    public IEnumerable<Session> GetAllSessions() => _sessions.Values;
 
     /// <inheritdoc/>
     public async Task<Session> UpdateSessionAsync(Session session, CancellationToken cancellationToken = default)
@@ -234,5 +235,162 @@ public class SessionManager : ISessionManager
             _logger.LogError(ex, "Failed to load sessions from: {FilePath}", _sessionFilePath);
             throw;
         }
+    }
+
+    /// <inheritdoc/>
+    public async Task<(int SessionsRemoved, int DirectoriesDeleted)> CleanupOldSessionsAsync(TimeSpan maxAge, bool deleteDirectories = false, CancellationToken cancellationToken = default)
+    {
+        if (maxAge < TimeSpan.Zero)
+            throw new ArgumentException("Max age cannot be negative", nameof(maxAge));
+
+        var cutoffDate = DateTime.UtcNow - maxAge;
+        var sessionsToRemove = _sessions.Values
+            .Where(s => s.LastAccessedAt < cutoffDate)
+            .ToList();
+
+        _logger.LogInformation("Cleaning up {SessionCount} sessions older than {MaxAge} days", sessionsToRemove.Count, maxAge.TotalDays);
+
+        var directoriesDeleted = 0;
+        var activeSessionName = _activeSession?.Name;
+
+        foreach (var session in sessionsToRemove)
+        {
+            // Don't remove the currently active session
+            if (session.Name == activeSessionName)
+            {
+                _logger.LogDebug("Skipping active session: {SessionName}", session.Name);
+                continue;
+            }
+
+            if (deleteDirectories && Directory.Exists(session.Directory))
+            {
+                try
+                {
+                    Directory.Delete(session.Directory, recursive: true);
+                    directoriesDeleted++;
+                    _logger.LogDebug("Deleted session directory: {Directory}", session.Directory);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to delete session directory: {Directory}", session.Directory);
+                }
+            }
+
+            _sessions.Remove(session.Name);
+            _logger.LogDebug("Removed session: {SessionName}", session.Name);
+        }
+
+        if (sessionsToRemove.Count > 0)
+        {
+            await SaveSessionsAsync(cancellationToken);
+        }
+
+        _logger.LogInformation("Session cleanup completed: {SessionsRemoved} sessions removed, {DirectoriesDeleted} directories deleted",
+            sessionsToRemove.Count, directoriesDeleted);
+
+        return (sessionsToRemove.Count, directoriesDeleted);
+    }
+
+    /// <inheritdoc/>
+    public SessionStatistics GetSessionStatistics()
+    {
+        if (!_sessions.Any())
+            return SessionStatistics.Empty;
+
+        var now = DateTime.UtcNow;
+        var sevenDaysAgo = now.AddDays(-7);
+        var thirtyDaysAgo = now.AddDays(-30);
+
+        var sessions = _sessions.Values.ToList();
+        var activeSessions = sessions.Count(s => s.LastAccessedAt >= sevenDaysAgo);
+        var oldSessions = sessions.Count(s => s.LastAccessedAt < thirtyDaysAgo);
+
+        var sessionAges = sessions.Select(s => (now - s.CreatedAt).TotalDays).ToList();
+        var averageAge = sessionAges.Average();
+        var oldestAge = sessionAges.Max();
+
+        var storageAccountsCount = sessions.Select(s => s.StorageAccountName).Distinct().Count();
+
+        return new SessionStatistics(
+            TotalSessions: sessions.Count,
+            ActiveSessions: activeSessions,
+            OldSessions: oldSessions,
+            AverageAge: averageAge,
+            OldestSessionAge: oldestAge,
+            StorageAccountsCount: storageAccountsCount);
+    }
+
+    /// <inheritdoc/>
+    public async Task<int> ValidateAndCleanupSessionsAsync(bool fixDirectories = false, CancellationToken cancellationToken = default)
+    {
+        var invalidSessions = new List<string>();
+        var activeSessionName = _activeSession?.Name;
+
+        _logger.LogInformation("Validating {SessionCount} sessions", _sessions.Count);
+
+        foreach (var session in _sessions.Values.ToList())
+        {
+            var isValid = true;
+
+            // Don't validate the currently active session's directory (it might be temporarily unavailable)
+            if (session.Name != activeSessionName)
+            {
+                if (!ValidateSessionDirectory(session, createIfMissing: fixDirectories))
+                {
+                    _logger.LogWarning("Session has invalid directory: {SessionName} -> {Directory}",
+                        session.Name, session.Directory);
+                    isValid = false;
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(session.Name) || session.Name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+            {
+                _logger.LogWarning("Session has invalid name: {SessionName}", session.Name);
+                isValid = false;
+            }
+
+            if (string.IsNullOrWhiteSpace(session.StorageAccountName) || !IsValidStorageAccountName(session.StorageAccountName))
+            {
+                _logger.LogWarning("Session has invalid storage account name: {SessionName} -> {StorageAccount}", session.Name, session.StorageAccountName);
+                isValid = false;
+            }
+
+            if (!isValid)
+            {
+                invalidSessions.Add(session.Name);
+            }
+        }
+
+        // Remove invalid sessions
+        foreach (var sessionName in invalidSessions)
+        {
+            _sessions.Remove(sessionName);
+            _logger.LogInformation("Removed invalid session: {SessionName}", sessionName);
+
+            // Clear active session if it was invalid
+            if (_activeSession?.Name == sessionName)
+            {
+                _activeSession = null;
+                _logger.LogInformation("Cleared active session due to validation failure");
+            }
+        }
+
+        if (invalidSessions.Count > 0)
+        {
+            await SaveSessionsAsync(cancellationToken);
+        }
+
+        _logger.LogInformation("Session validation completed: {InvalidCount} invalid sessions removed", invalidSessions.Count);
+
+        return invalidSessions.Count;
+    }
+
+    private static bool IsValidStorageAccountName(string name)
+    {
+        // Azure Storage account names must be 3-24 characters, lowercase letters and numbers only
+        if (name.Length < 3 || name.Length > 24)
+            return false;
+
+        return name.All(c => char.IsLetter(c) && char.IsLower(c) || char.IsDigit(c));
     }
 }
