@@ -3,7 +3,6 @@ using AzStore.Core.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Terminal.Gui;
-using System.Collections.ObjectModel;
 
 namespace AzStore.Terminal;
 
@@ -15,13 +14,13 @@ public class TerminalGuiUI : ITerminalUI
     private bool _isRunning;
     private TaskCompletionSource<NavigationResult>? _currentNavigationTask;
 
-    public TerminalGuiUI(ILogger<TerminalGuiUI> logger, ILoggerFactory loggerFactory, IOptions<AzStoreSettings> settings)
+    public TerminalGuiUI(ILogger<TerminalGuiUI> logger, ILoggerFactory loggerFactory, IOptions<AzStoreSettings> settings, IInputHandler inputHandler)
     {
         _logger = logger;
         _loggerFactory = loggerFactory;
-        
+
         var browserLogger = _loggerFactory.CreateLogger<BlobBrowserView>();
-        _browserView = new BlobBrowserView(browserLogger, settings.Value.KeyBindings);
+        _browserView = new BlobBrowserView(browserLogger, settings.Value.KeyBindings, inputHandler);
         _browserView.NavigationRequested += OnNavigationRequested;
     }
 
@@ -34,26 +33,26 @@ public class TerminalGuiUI : ITerminalUI
     public Task RunAsync(CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Starting Terminal.Gui application");
-        
+
         try
         {
             Application.Init();
             _isRunning = true;
-            
+
             var top = new Toplevel();
-            var win = new Window() 
-            { 
-                Title = "AzStore - Azure Blob Storage Terminal" 
+            var win = new Window()
+            {
+                Title = "AzStore - Azure Blob Storage Terminal"
             };
-            
+
             _browserView.X = 0;
             _browserView.Y = 0;
             _browserView.Width = Dim.Fill();
             _browserView.Height = Dim.Fill();
-            
+
             win.Add(_browserView);
             top.Add(win);
-            
+
             Application.Top?.Add(top);
             Application.Run();
         }
@@ -68,7 +67,7 @@ public class TerminalGuiUI : ITerminalUI
             _isRunning = false;
             _logger.LogInformation("Terminal.Gui application stopped");
         }
-        
+
         return Task.CompletedTask;
     }
 
@@ -78,11 +77,10 @@ public class TerminalGuiUI : ITerminalUI
         CancellationToken cancellationToken = default)
     {
         _currentNavigationTask = new TaskCompletionSource<NavigationResult>();
-        
+
         _browserView.UpdateItems(items, navigationState);
 
-        using var registration = cancellationToken.Register(() => 
-            _currentNavigationTask.TrySetCanceled());
+        using var registration = cancellationToken.Register(() => _currentNavigationTask.TrySetCanceled());
 
         try
         {

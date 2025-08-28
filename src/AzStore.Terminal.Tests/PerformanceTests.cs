@@ -16,7 +16,8 @@ public class PerformanceTests
     {
         var logger = Substitute.For<ILogger<BlobBrowserView>>();
         var keyBindings = new KeyBindings();
-        var view = new BlobBrowserView(logger, keyBindings);
+        var inputHandler = Substitute.For<IInputHandler>();
+        var view = new BlobBrowserView(logger, keyBindings, inputHandler);
         
         var items = GenerateLargeItemList(1000);
         var navigationState = NavigationState.CreateInContainer("test-session", "storage-account", "container");
@@ -37,7 +38,8 @@ public class PerformanceTests
     {
         var logger = Substitute.For<ILogger<BlobBrowserView>>();
         var keyBindings = new KeyBindings();
-        var view = new BlobBrowserView(logger, keyBindings);
+        var inputHandler = Substitute.For<IInputHandler>();
+        var view = new BlobBrowserView(logger, keyBindings, inputHandler);
         
         var items = GenerateLargeItemList(5000);
         var navigationState = NavigationState.CreateInContainer("test-session", "storage-account", "container");
@@ -96,7 +98,8 @@ public class PerformanceTests
     {
         var logger = Substitute.For<ILogger<BlobBrowserView>>();
         var keyBindings = new KeyBindings();
-        var view = new BlobBrowserView(logger, keyBindings);
+        var inputHandler = Substitute.For<IInputHandler>();
+        var view = new BlobBrowserView(logger, keyBindings, inputHandler);
         
         var beforeMemory = GC.GetTotalMemory(true);
         
@@ -118,7 +121,8 @@ public class PerformanceTests
     {
         var logger = Substitute.For<ILogger<BlobBrowserView>>();
         var keyBindings = new KeyBindings();
-        var view = new BlobBrowserView(logger, keyBindings);
+        var inputHandler = Substitute.For<IInputHandler>();
+        var view = new BlobBrowserView(logger, keyBindings, inputHandler);
         
         var items = GenerateLargeItemList(500);
         var navigationState = NavigationState.CreateInContainer("test-session", "storage-account", "container");

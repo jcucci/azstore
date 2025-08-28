@@ -24,5 +24,7 @@ public enum NavigationAction
     /// <summary>Jump to bottom of list (G key)</summary>
     JumpToBottom,
     /// <summary>Download selected item (dd keys)</summary>
-    Download
+    Download,
+    /// <summary>Cancel current operation or clear input (Escape key)</summary>
+    Cancel
 }
