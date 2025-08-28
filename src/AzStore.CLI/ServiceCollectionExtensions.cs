@@ -18,6 +18,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IAuthenticationService, AuthenticationService>();
         services.AddSingleton<IPathService, PathService>();
         services.AddSingleton<IStorageService, AzureStorageService>();
+        services.AddSingleton<ISessionManager, SessionManager>();
+        services.AddSingleton<INavigationEngine, NavigationEngine>();
         services.AddSingleton<IReplEngine, ReplEngine>();
         services.AddSingleton<ITerminalUI, TerminalGuiUI>();
 
@@ -25,6 +27,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<ICommand, HelpCommand>();
         services.AddTransient<ICommand, ListCommand>();
         services.AddTransient<ICommand, DownloadCommand>();
+        services.AddTransient<ICommand, SessionCommand>();
         services.AddSingleton<ICommandRegistry, CommandRegistry>();
 
         services.AddHostedService<ReplHostedService>();

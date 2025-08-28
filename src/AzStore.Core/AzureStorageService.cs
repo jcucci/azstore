@@ -392,7 +392,7 @@ public class AzureStorageService : IStorageService
 
             if (options.CreateDirectories)
             {
-                var directoryCreated = await _pathService.EnsureDirectoryExistsAsync(resolvedFilePath, cancellationToken);
+                var directoryCreated = _pathService.EnsureDirectoryExists(resolvedFilePath);
                 if (!directoryCreated)
                 {
                     return new DownloadResult(
@@ -461,9 +461,7 @@ public class AzureStorageService : IStorageService
                 if (cancellationToken.IsCancellationRequested)
                     break;
 
-                var session = _sessionManager != null 
-                    ? await _sessionManager.GetActiveSessionAsync(cancellationToken) 
-                    : null;
+                var session = _sessionManager?.GetActiveSession();
                 var localFilePath = session != null 
                     ? _pathService.CalculateBlobDownloadPath(session, containerName, blob.Name)
                     : Path.Combine(localDirectoryPath, _pathService.PreserveVirtualDirectoryStructure(blob.Name));

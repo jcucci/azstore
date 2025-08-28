@@ -1,4 +1,5 @@
 using AzStore.Configuration;
+using AzStore.Core;
 using AzStore.Terminal;
 using AzStore.Terminal.Commands;
 using Microsoft.Extensions.Logging;
@@ -16,8 +17,10 @@ public class ReplEngineCommandTests
         var settings = CreateMockSettings();
         var logger = Substitute.For<ILogger<ReplEngine>>();
         var commandRegistry = Substitute.For<ICommandRegistry>();
+        var sessionManager = Substitute.For<ISessionManager>();
+        var navigationEngine = Substitute.For<INavigationEngine>();
         
-        var replEngine = new ReplEngine(settings, logger, commandRegistry);
+        var replEngine = new ReplEngine(settings, logger, commandRegistry, sessionManager, navigationEngine);
         
         Assert.NotNull(replEngine);
     }
