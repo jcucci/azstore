@@ -251,6 +251,7 @@ public class SessionManager : ISessionManager
         _logger.LogInformation("Cleaning up {SessionCount} sessions older than {MaxAge} days", sessionsToRemove.Count, maxAge.TotalDays);
 
         var directoriesDeleted = 0;
+        var sessionsRemoved = 0;
         var activeSessionName = _activeSession?.Name;
 
         foreach (var session in sessionsToRemove)
@@ -277,24 +278,25 @@ public class SessionManager : ISessionManager
             }
 
             _sessions.Remove(session.Name);
+            sessionsRemoved++;
             _logger.LogDebug("Removed session: {SessionName}", session.Name);
         }
 
-        if (sessionsToRemove.Count > 0)
+        if (sessionsRemoved > 0)
         {
             await SaveSessionsAsync(cancellationToken);
         }
 
         _logger.LogInformation("Session cleanup completed: {SessionsRemoved} sessions removed, {DirectoriesDeleted} directories deleted",
-            sessionsToRemove.Count, directoriesDeleted);
+            sessionsRemoved, directoriesDeleted);
 
-        return (sessionsToRemove.Count, directoriesDeleted);
+        return (sessionsRemoved, directoriesDeleted);
     }
 
     /// <inheritdoc/>
     public SessionStatistics GetSessionStatistics()
     {
-        if (!_sessions.Any())
+        if (_sessions.Count == 0)
             return SessionStatistics.Empty;
 
         var now = DateTime.UtcNow;
@@ -391,6 +393,6 @@ public class SessionManager : ISessionManager
         if (name.Length < 3 || name.Length > 24)
             return false;
 
-        return name.All(c => char.IsLetter(c) && char.IsLower(c) || char.IsDigit(c));
+        return name.All(c => (char.IsLetter(c) && char.IsLower(c)) || char.IsDigit(c));
     }
 }
