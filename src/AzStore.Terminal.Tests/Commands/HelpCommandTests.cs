@@ -1,4 +1,5 @@
 using AzStore.Terminal.Commands;
+using AzStore.Configuration;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using Xunit;
@@ -10,8 +11,8 @@ public class HelpCommandTests
     [Fact]
     public void Name_ReturnsHelp()
     {
-        var (logger, commandRegistry) = CreateTestDependencies();
-        var command = new HelpCommand(logger, commandRegistry);
+        var (logger, commandRegistry, keyBindings) = CreateTestDependencies();
+        var command = new HelpCommand(logger, commandRegistry, keyBindings);
         
         Assert.Equal("help", command.Name);
     }
@@ -19,8 +20,8 @@ public class HelpCommandTests
     [Fact]
     public void Aliases_IsEmpty()
     {
-        var (logger, commandRegistry) = CreateTestDependencies();
-        var command = new HelpCommand(logger, commandRegistry);
+        var (logger, commandRegistry, keyBindings) = CreateTestDependencies();
+        var command = new HelpCommand(logger, commandRegistry, keyBindings);
         
         Assert.Empty(command.Aliases);
     }
@@ -28,8 +29,8 @@ public class HelpCommandTests
     [Fact]
     public void Description_IsNotEmpty()
     {
-        var (logger, commandRegistry) = CreateTestDependencies();
-        var command = new HelpCommand(logger, commandRegistry);
+        var (logger, commandRegistry, keyBindings) = CreateTestDependencies();
+        var command = new HelpCommand(logger, commandRegistry, keyBindings);
         
         Assert.False(string.IsNullOrWhiteSpace(command.Description));
     }
@@ -37,8 +38,8 @@ public class HelpCommandTests
     [Fact]
     public async Task ExecuteAsync_ReturnsSuccessResult()
     {
-        var (logger, commandRegistry) = CreateTestDependencies();
-        var command = new HelpCommand(logger, commandRegistry);
+        var (logger, commandRegistry, keyBindings) = CreateTestDependencies();
+        var command = new HelpCommand(logger, commandRegistry, keyBindings);
         
         var result = await command.ExecuteAsync(Array.Empty<string>());
         
@@ -50,8 +51,8 @@ public class HelpCommandTests
     [Fact]
     public async Task ExecuteAsync_LogsDebugMessage()
     {
-        var (logger, commandRegistry) = CreateTestDependencies();
-        var command = new HelpCommand(logger, commandRegistry);
+        var (logger, commandRegistry, keyBindings) = CreateTestDependencies();
+        var command = new HelpCommand(logger, commandRegistry, keyBindings);
         
         await command.ExecuteAsync(Array.Empty<string>());
         
@@ -71,8 +72,9 @@ public class HelpCommandTests
         };
         
         commandRegistry.GetAllCommands().Returns(commands);
+        var keyBindings = new KeyBindings();
         
-        var command = new HelpCommand(logger, commandRegistry);
+        var command = new HelpCommand(logger, commandRegistry, keyBindings);
         var result = await command.ExecuteAsync(Array.Empty<string>());
         
         Assert.Contains("test1", result.Message);
@@ -88,22 +90,24 @@ public class HelpCommandTests
         
         var commands = new[] { CreateMockCommand("test", ["t"], "Test description") };
         commandRegistry.GetAllCommands().Returns(commands);
+        var keyBindings = new KeyBindings();
         
-        var command = new HelpCommand(logger, commandRegistry);
+        var command = new HelpCommand(logger, commandRegistry, keyBindings);
         var result = await command.ExecuteAsync(Array.Empty<string>());
         
         Assert.Contains(":test, :t - Test description", result.Message);
     }
 
-    private static (ILogger<HelpCommand>, ICommandRegistry) CreateTestDependencies()
+    private static (ILogger<HelpCommand>, ICommandRegistry, KeyBindings) CreateTestDependencies()
     {
         var logger = Substitute.For<ILogger<HelpCommand>>();
         var commandRegistry = Substitute.For<ICommandRegistry>();
+        var keyBindings = new KeyBindings();
         
         var commands = new[] { CreateMockCommand("test", Array.Empty<string>(), "Test description") };
         commandRegistry.GetAllCommands().Returns(commands);
         
-        return (logger, commandRegistry);
+        return (logger, commandRegistry, keyBindings);
     }
 
     private static ICommand CreateMockCommand(string name, string[] aliases, string description)

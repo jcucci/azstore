@@ -134,6 +134,60 @@ public class InputHandlerTests : IDisposable
     }
 
     [Fact]
+    public void ProcessKeyEvent_UppercaseG_RaisesJumpToBottom()
+    {
+        // Test uppercase G directly - InputHandler should detect this as uppercase
+        var result = _inputHandler.ProcessKeyEvent((Key)'G');
+        
+        Assert.True(result);
+        Assert.Single(_capturedResults);
+        Assert.Equal(NavigationAction.JumpToBottom, _capturedResults[0].Action);
+        Assert.Equal(KeyBindingAction.Bottom, _capturedResults[0].KeyBindingAction);
+    }
+
+    [Fact]
+    public void ProcessKeyEvent_JumpToTopEmptyList_HandlesGracefully()
+    {
+        // First 'g' should return partial match
+        var result1 = _inputHandler.ProcessKeyEvent((Key)'g');
+        Assert.True(result1);
+        Assert.Empty(_capturedResults);
+
+        // Second 'g' should complete sequence even with empty list
+        var result2 = _inputHandler.ProcessKeyEvent((Key)'g');
+        Assert.True(result2);
+        Assert.Single(_capturedResults);
+        Assert.Equal(NavigationAction.JumpToTop, _capturedResults[0].Action);
+        Assert.Equal(KeyBindingAction.Top, _capturedResults[0].KeyBindingAction);
+    }
+
+    [Fact]
+    public void ProcessKeyEvent_JumpToBottomEmptyList_HandlesGracefully()
+    {
+        var result = _inputHandler.ProcessKeyEvent((Key)'G');
+        
+        Assert.True(result);
+        Assert.Single(_capturedResults);
+        Assert.Equal(NavigationAction.JumpToBottom, _capturedResults[0].Action);
+        Assert.Equal(KeyBindingAction.Bottom, _capturedResults[0].KeyBindingAction);
+    }
+
+    [Fact]
+    public void ProcessKeyEvent_MultipleJumpCommands_AllProcessedCorrectly()
+    {
+        // Test gg (jump to top)
+        _inputHandler.ProcessKeyEvent((Key)'g');
+        _inputHandler.ProcessKeyEvent((Key)'g');
+        
+        // Test G (jump to bottom)  
+        _inputHandler.ProcessKeyEvent((Key)'G');
+        
+        Assert.Equal(2, _capturedResults.Count);
+        Assert.Equal(NavigationAction.JumpToTop, _capturedResults[0].Action);
+        Assert.Equal(NavigationAction.JumpToBottom, _capturedResults[1].Action);
+    }
+
+    [Fact]
     public void ProcessKeyEvent_SearchCommand_RaisesCommandWithSlash()
     {
         var result = _inputHandler.ProcessKeyEvent((Key)'/');

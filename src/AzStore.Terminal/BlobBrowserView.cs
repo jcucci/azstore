@@ -20,6 +20,8 @@ public class BlobBrowserView : View
     private Label? _statusLabel;
     private NavigationState? _currentState;
     private IReadOnlyList<StorageItem> _currentItems = [];
+    private Timer? _statusTimer;
+    private string _defaultStatusText = string.Empty;
 
     public event EventHandler<NavigationResult>? NavigationRequested;
 
@@ -180,7 +182,9 @@ public class BlobBrowserView : View
         var itemCount = _currentItems.Count;
         var selectedIndex = _listView?.SelectedItem ?? 0;
 
-        _statusLabel.Text = $"{level} | {itemCount} items | Selected: {selectedIndex + 1}/{itemCount} | j/k:nav l:enter h:back gg:top G:bottom dd:download";
+        var statusText = $"{level} | {itemCount} items | Selected: {selectedIndex + 1}/{itemCount} | j/k:nav l:enter h:back gg:top G:bottom dd:download";
+        _statusLabel.Text = statusText;
+        _defaultStatusText = statusText;
     }
 
     private void HandleItemSelection()
@@ -228,6 +232,7 @@ public class BlobBrowserView : View
         if (_listView != null && _currentItems.Count > 0)
         {
             _listView.SelectedItem = 0;
+            ShowTemporaryStatus("Jumped to top");
             var result = new NavigationResult(NavigationAction.JumpToTop);
             NavigationRequested?.Invoke(this, result);
 
@@ -240,6 +245,7 @@ public class BlobBrowserView : View
         if (_listView != null && _currentItems.Count > 0)
         {
             _listView.SelectedItem = _currentItems.Count - 1;
+            ShowTemporaryStatus("Jumped to bottom");
             var result = new NavigationResult(NavigationAction.JumpToBottom);
             NavigationRequested?.Invoke(this, result);
 
@@ -302,5 +308,28 @@ public class BlobBrowserView : View
         }
 
         return $"{number:n1}{FileSizeSuffixes[counter]}";
+    }
+
+    private void ShowTemporaryStatus(string message)
+    {
+        if (_statusLabel == null)
+            return;
+
+        if (_statusTimer == null)
+            _defaultStatusText = _statusLabel.Text;
+
+        _statusTimer?.Dispose();
+        _statusLabel.Text = message;
+        _statusTimer = new Timer(RestoreDefaultStatus, null, 2000, System.Threading.Timeout.Infinite);
+    }
+
+    private void RestoreDefaultStatus(object? state)
+    {
+        if (_statusLabel != null)
+        {
+            _statusLabel.Text = _defaultStatusText;
+        }
+        _statusTimer?.Dispose();
+        _statusTimer = null;
     }
 }
