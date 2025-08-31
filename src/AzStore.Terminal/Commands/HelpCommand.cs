@@ -10,7 +10,7 @@ public class HelpCommand : ICommand
     private readonly KeyBindings _keyBindings;
 
     public string Name => "help";
-    public string[] Aliases => Array.Empty<string>();
+    public string[] Aliases => [];
     public string Description => "Show help and navigation keybindings";
 
     public HelpCommand(ILogger<HelpCommand> logger, ICommandRegistry commandRegistry, KeyBindings keyBindings)

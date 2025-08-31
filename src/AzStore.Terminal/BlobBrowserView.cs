@@ -22,6 +22,7 @@ public class BlobBrowserView : View
     private IReadOnlyList<StorageItem> _currentItems = [];
     private Timer? _statusTimer;
     private string _defaultStatusText = string.Empty;
+    private const int StatusMessageTimeoutMs = 2000;
 
     public event EventHandler<NavigationResult>? NavigationRequested;
 
@@ -82,14 +83,12 @@ public class BlobBrowserView : View
 
         _listView.KeyDown += (s, keyEvent) =>
         {
-            // Delegate all key processing to the input handler
             _inputHandler.ProcessKeyEvent(keyEvent);
         };
     }
 
     private void OnNavigationRequested(object? sender, NavigationResult result)
     {
-        // Handle navigation actions that affect the view directly
         switch (result.Action)
         {
             case NavigationAction.Enter when result.KeyBindingAction == KeyBindingAction.MoveDown:
@@ -320,7 +319,7 @@ public class BlobBrowserView : View
 
         _statusTimer?.Dispose();
         _statusLabel.Text = message;
-        _statusTimer = new Timer(RestoreDefaultStatus, null, 2000, System.Threading.Timeout.Infinite);
+        _statusTimer = new Timer(RestoreDefaultStatus, null, StatusMessageTimeoutMs, System.Threading.Timeout.Infinite);
     }
 
     private void RestoreDefaultStatus(object? state)
