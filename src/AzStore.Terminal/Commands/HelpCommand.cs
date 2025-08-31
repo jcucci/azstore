@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using AzStore.Configuration;
 
 namespace AzStore.Terminal.Commands;
 
@@ -6,15 +7,17 @@ public class HelpCommand : ICommand
 {
     private readonly ILogger<HelpCommand> _logger;
     private readonly ICommandRegistry _commandRegistry;
+    private readonly KeyBindings _keyBindings;
 
     public string Name => "help";
-    public string[] Aliases => Array.Empty<string>();
-    public string Description => "Show this help message";
+    public string[] Aliases => [];
+    public string Description => "Show help and navigation keybindings";
 
-    public HelpCommand(ILogger<HelpCommand> logger, ICommandRegistry commandRegistry)
+    public HelpCommand(ILogger<HelpCommand> logger, ICommandRegistry commandRegistry, KeyBindings keyBindings)
     {
         _logger = logger;
         _commandRegistry = commandRegistry;
+        _keyBindings = keyBindings;
     }
 
     public Task<CommandResult> ExecuteAsync(string[] args, CancellationToken cancellationToken = default)
@@ -30,7 +33,26 @@ public class HelpCommand : ICommand
         var commands = _commandRegistry.GetAllCommands();
         var helpLines = commands.Select(FormatCommandHelp);
         
-        return "Available commands:\n" + string.Join("\n", helpLines);
+        var commandsSection = "Available commands:\n" + string.Join("\n", helpLines);
+        var navigationSection = BuildNavigationHelp();
+        
+        return commandsSection + "\n\n" + navigationSection;
+    }
+
+    private string BuildNavigationHelp()
+    {
+        return $"""
+            Navigation keybindings:
+              {_keyBindings.MoveDown}/{_keyBindings.MoveUp} - Move down/up in list
+              {_keyBindings.Enter}/Enter/→ - Select item or navigate into container
+              {_keyBindings.Back}/← - Navigate back/up one level
+              {_keyBindings.Top} - Jump to top of list
+              {_keyBindings.Bottom} - Jump to bottom of list
+              {_keyBindings.Download} - Download selected item
+              {_keyBindings.Search} - Enter search mode
+              {_keyBindings.Command} - Enter command mode
+              Esc - Cancel current operation
+            """;
     }
 
     private static string FormatCommandHelp(ICommand command)
