@@ -24,6 +24,16 @@ public interface INavigationEngine
     NavigationItem? SelectedItem { get; }
 
     /// <summary>
+    /// Gets the current navigation mode (Normal, Command, Visual).
+    /// </summary>
+    NavigationMode CurrentMode { get; }
+
+    /// <summary>
+    /// Gets the VIM navigator for modal state management.
+    /// </summary>
+    VimNavigator VimNavigator { get; }
+
+    /// <summary>
     /// Initializes navigation at the storage account level for the given session.
     /// </summary>
     /// <param name="session">The session to navigate within.</param>
@@ -86,58 +96,10 @@ public interface INavigationEngine
     /// Event raised when an error occurs during navigation.
     /// </summary>
     event EventHandler<NavigationErrorEventArgs>? NavigationError;
+
+    /// <summary>
+    /// Event raised when the navigation mode changes.
+    /// </summary>
+    event EventHandler<NavigationModeChangedEventArgs>? ModeChanged;
 }
 
-/// <summary>
-/// Event arguments for navigation state changes.
-/// </summary>
-public class NavigationStateChangedEventArgs : EventArgs
-{
-    /// <summary>
-    /// Gets the previous navigation state.
-    /// </summary>
-    public NavigationState? PreviousState { get; }
-
-    /// <summary>
-    /// Gets the new navigation state.
-    /// </summary>
-    public NavigationState CurrentState { get; }
-
-    /// <summary>
-    /// Initializes a new instance of the NavigationStateChangedEventArgs class.
-    /// </summary>
-    /// <param name="previousState">The previous navigation state.</param>
-    /// <param name="currentState">The new navigation state.</param>
-    public NavigationStateChangedEventArgs(NavigationState? previousState, NavigationState currentState)
-    {
-        PreviousState = previousState;
-        CurrentState = currentState;
-    }
-}
-
-/// <summary>
-/// Event arguments for navigation errors.
-/// </summary>
-public class NavigationErrorEventArgs : EventArgs
-{
-    /// <summary>
-    /// Gets the error message.
-    /// </summary>
-    public string Message { get; }
-
-    /// <summary>
-    /// Gets the exception that caused the error, if available.
-    /// </summary>
-    public Exception? Exception { get; }
-
-    /// <summary>
-    /// Initializes a new instance of the NavigationErrorEventArgs class.
-    /// </summary>
-    /// <param name="message">The error message.</param>
-    /// <param name="exception">The exception that caused the error.</param>
-    public NavigationErrorEventArgs(string message, Exception? exception = null)
-    {
-        Message = message;
-        Exception = exception;
-    }
-}
