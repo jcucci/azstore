@@ -21,6 +21,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IPathService, PathService>();
         services.AddSingleton<IStorageService, AzureStorageService>();
         services.AddSingleton<ISessionManager, SessionManager>();
+        services.AddSingleton<VimNavigator>();
         services.AddSingleton<INavigationEngine, NavigationEngine>();
         services.AddSingleton<IReplEngine, ReplEngine>();
         services.AddSingleton<IInputHandler>(provider =>

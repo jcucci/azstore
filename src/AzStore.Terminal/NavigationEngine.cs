@@ -12,6 +12,7 @@ public class NavigationEngine : INavigationEngine
 {
     private readonly IStorageService _storageService;
     private readonly ILogger<NavigationEngine> _logger;
+    private readonly VimNavigator _vimNavigator;
     private Session? _currentSession;
     private NavigationState? _currentState;
     private readonly List<NavigationItem> _currentItems = [];
@@ -31,20 +32,34 @@ public class NavigationEngine : INavigationEngine
         : null;
 
     /// <inheritdoc/>
+    public NavigationMode CurrentMode => _vimNavigator.CurrentMode;
+
+    /// <inheritdoc/>
+    public VimNavigator VimNavigator => _vimNavigator;
+
+    /// <inheritdoc/>
     public event EventHandler<NavigationStateChangedEventArgs>? StateChanged;
 
     /// <inheritdoc/>
     public event EventHandler<NavigationErrorEventArgs>? NavigationError;
+
+    /// <inheritdoc/>
+    public event EventHandler<NavigationModeChangedEventArgs>? ModeChanged;
 
     /// <summary>
     /// Initializes a new instance of the NavigationEngine class.
     /// </summary>
     /// <param name="storageService">The storage service for accessing Azure Blob Storage.</param>
     /// <param name="logger">Logger instance for this service.</param>
-    public NavigationEngine(IStorageService storageService, ILogger<NavigationEngine> logger)
+    /// <param name="vimNavigator">The VIM navigator for modal state management.</param>
+    public NavigationEngine(IStorageService storageService, ILogger<NavigationEngine> logger, VimNavigator vimNavigator)
     {
         _storageService = storageService ?? throw new ArgumentNullException(nameof(storageService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _vimNavigator = vimNavigator ?? throw new ArgumentNullException(nameof(vimNavigator));
+
+        // Wire up VIM navigator events
+        _vimNavigator.ModeChanged += OnVimNavigatorModeChanged;
     }
 
     /// <inheritdoc/>
@@ -72,6 +87,13 @@ public class NavigationEngine : INavigationEngine
             return;
         }
 
+        // Check if the action is valid for the current mode
+        if (!_vimNavigator.IsActionValidForCurrentMode(action))
+        {
+            _logger.LogDebug("Action {Action} not valid for current mode {Mode}", action, _vimNavigator.CurrentMode);
+            return;
+        }
+
         try
         {
             var previousState = _currentState;
@@ -85,6 +107,7 @@ public class NavigationEngine : INavigationEngine
                 KeyBindingAction.Top => JumpToTopAsync(),
                 KeyBindingAction.Bottom => JumpToBottomAsync(),
                 KeyBindingAction.Download => DownloadSelectedItemAsync(cancellationToken),
+                KeyBindingAction.Command => HandleCommandModeAsync(),
                 _ => Task.CompletedTask
             });
 
@@ -378,6 +401,12 @@ public class NavigationEngine : INavigationEngine
         return Task.CompletedTask;
     }
 
+    private Task HandleCommandModeAsync()
+    {
+        _vimNavigator.EnterCommandMode();
+        return Task.CompletedTask;
+    }
+
     private static string FormatSize(long bytes)
     {
         string[] sizes = ["B", "KB", "MB", "GB", "TB"];
@@ -391,5 +420,11 @@ public class NavigationEngine : INavigationEngine
         }
 
         return $"{len:0.##} {sizes[order]}";
+    }
+
+    private void OnVimNavigatorModeChanged(object? sender, NavigationModeChangedEventArgs e)
+    {
+        _logger.LogDebug("Navigation mode changed: {PreviousMode} -> {CurrentMode}", e.PreviousMode, e.CurrentMode);
+        ModeChanged?.Invoke(this, e);
     }
 }
