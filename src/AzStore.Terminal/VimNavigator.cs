@@ -7,6 +7,7 @@ namespace AzStore.Terminal;
 /// </summary>
 public class VimNavigator
 {
+    private const int MaxCommandLength = 256;
     private readonly ILogger<VimNavigator> _logger;
     private readonly Stack<NavigationMode> _modeHistory = [];
 
@@ -103,11 +104,17 @@ public class VimNavigator
     /// Appends a character to the pending command in command mode.
     /// </summary>
     /// <param name="character">The character to append.</param>
-    /// <returns>true if the character was appended; false if not in command mode.</returns>
+    /// <returns>true if the character was appended; false if not in command mode or command would exceed maximum length.</returns>
     public bool AppendToCommand(char character)
     {
         if (_currentMode != NavigationMode.Command)
             return false;
+
+        if (_pendingCommand?.Length >= MaxCommandLength)
+        {
+            _logger.LogWarning("Command length limit reached ({MaxLength}), ignoring input", MaxCommandLength);
+            return false;
+        }
 
         _pendingCommand += character;
         _logger.LogTrace("Appended '{Character}' to command: {Command}", character, _pendingCommand);

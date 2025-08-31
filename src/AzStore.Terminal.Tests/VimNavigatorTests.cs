@@ -217,11 +217,11 @@ public class VimNavigatorTests
     public void Reset_ReturnsToNormalMode()
     {
         _navigator.SwitchMode(NavigationMode.Command);
-        _navigator.SwitchMode(NavigationMode.Visual);
         _navigator.AppendToCommand('t');
         _navigator.AppendToCommand('e');
         _navigator.AppendToCommand('s');
         _navigator.AppendToCommand('t');
+        _navigator.SwitchMode(NavigationMode.Visual);
 
         _navigator.Reset();
 
@@ -278,5 +278,25 @@ public class VimNavigatorTests
         var result = _navigator.ExitMode(); // No more history
         Assert.False(result);
         Assert.Equal(NavigationMode.Normal, _navigator.CurrentMode);
+    }
+
+    [Fact]
+    public void AppendToCommand_RespectsCcommandLengthLimit()
+    {
+        _navigator.EnterCommandMode();
+        
+        // Fill command to near maximum length (256 - 1 for the prefix)
+        for (int i = 0; i < 255; i++)
+        {
+            var result = _navigator.AppendToCommand('x');
+            Assert.True(result, $"Failed to append character {i}");
+        }
+        
+        // This should fail due to length limit
+        var failResult = _navigator.AppendToCommand('y');
+        Assert.False(failResult);
+        
+        // Verify command length is still at limit
+        Assert.Equal(256, _navigator.PendingCommand?.Length);
     }
 }
