@@ -1,4 +1,4 @@
-using AzStore.Core.Models;
+using AzStore.Core.Models.Session;
 using Xunit;
 
 namespace AzStore.Core.Tests.Models;
@@ -29,9 +29,9 @@ public class SessionTests
     {
         var originalSession = Session.Create("test", "/path", "storage", Guid.NewGuid());
         var originalLastAccessed = originalSession.LastAccessedAt;
-        
+
         Thread.Sleep(10); // Ensure time difference
-        
+
         var touchedSession = originalSession.Touch();
 
         Assert.True(touchedSession.LastAccessedAt > originalLastAccessed);

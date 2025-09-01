@@ -1,5 +1,5 @@
 using Xunit;
-using AzStore.Core.Models;
+using AzStore.Core.Models.Paging;
 
 namespace AzStore.Core.Tests;
 
@@ -14,9 +14,9 @@ public class AzureStorageServiceIntegrationTests
     public void GetConnectionStatus_WhenNotConnected_ReturnsFalse()
     {
         var service = AzureStorageServiceFixture.CreateWithMockDependencies();
-        
+
         var status = service.GetConnectionStatus();
-        
+
         Assert.False(status);
     }
 
@@ -25,10 +25,10 @@ public class AzureStorageServiceIntegrationTests
     {
         var service = AzureStorageServiceFixture.CreateWithMockDependencies();
         var pageRequest = PageRequest.FirstPage();
-        
+
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             service.ListContainersAsync(pageRequest));
-        
+
         Assert.Contains("not connected", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -36,10 +36,10 @@ public class AzureStorageServiceIntegrationTests
     public async Task GetContainerPropertiesAsync_WhenNotConnected_ThrowsInvalidOperationException()
     {
         var service = AzureStorageServiceFixture.CreateWithMockDependencies();
-        
+
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             service.GetContainerPropertiesAsync("test-container"));
-        
+
         Assert.Contains("not connected", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -47,10 +47,10 @@ public class AzureStorageServiceIntegrationTests
     public async Task ValidateContainerAccessAsync_WhenNotConnected_ThrowsInvalidOperationException()
     {
         var service = AzureStorageServiceFixture.CreateWithMockDependencies();
-        
+
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             service.ValidateContainerAccessAsync("test-container"));
-        
+
         Assert.Contains("not connected", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -59,10 +59,10 @@ public class AzureStorageServiceIntegrationTests
     {
         var service = AzureStorageServiceFixture.CreateWithMockDependencies();
         var pageRequest = PageRequest.FirstPage();
-        
+
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             service.BrowseBlobsAsync("test-container", null, pageRequest));
-        
+
         Assert.Contains("not connected", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -71,10 +71,10 @@ public class AzureStorageServiceIntegrationTests
     {
         var service = AzureStorageServiceFixture.CreateWithMockDependencies();
         var pageRequest = PageRequest.FirstPage();
-        
+
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             service.ListVirtualDirectoriesAsync("test-container", null, pageRequest));
-        
+
         Assert.Contains("not connected", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -83,10 +83,10 @@ public class AzureStorageServiceIntegrationTests
     {
         var service = AzureStorageServiceFixture.CreateWithMockDependencies();
         var pageRequest = PageRequest.FirstPage();
-        
+
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             service.NavigateToPathAsync("test-container", "documents/", pageRequest));
-        
+
         Assert.Contains("not connected", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -95,10 +95,10 @@ public class AzureStorageServiceIntegrationTests
     {
         var service = AzureStorageServiceFixture.CreateWithMockDependencies();
         var pageRequest = PageRequest.FirstPage();
-        
+
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             service.SearchBlobsAsync("test-container", "*.txt", null, pageRequest));
-        
+
         Assert.Contains("not connected", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 }

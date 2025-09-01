@@ -1,5 +1,5 @@
-using AzStore.Core.Exceptions;
-using AzStore.Core.Models;
+using AzStore.Core.Models.Session;
+using AzStore.Core.Services.Implementations;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using Xunit;
@@ -47,7 +47,7 @@ public class PathServiceTests
     public void CalculateBlobDownloadPath_NullSession_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
             _pathService.CalculateBlobDownloadPath(null!, "container", "blob"));
     }
 
@@ -59,7 +59,7 @@ public class PathServiceTests
         var session = CreateTestSession("test", "/home/user");
 
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
             _pathService.CalculateBlobDownloadPath(session, null!, "blob"));
     }
 
@@ -73,7 +73,7 @@ public class PathServiceTests
         var session = CreateTestSession("test", "/home/user");
 
         // Act & Assert
-        Assert.Throws<ArgumentException>(() => 
+        Assert.Throws<ArgumentException>(() =>
             _pathService.CalculateBlobDownloadPath(session, containerName, "blob"));
     }
 
@@ -85,7 +85,7 @@ public class PathServiceTests
         var session = CreateTestSession("test", "/home/user");
 
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
             _pathService.CalculateBlobDownloadPath(session, "container", null!));
     }
 
@@ -99,7 +99,7 @@ public class PathServiceTests
         var session = CreateTestSession("test", "/home/user");
 
         // Act & Assert
-        Assert.Throws<ArgumentException>(() => 
+        Assert.Throws<ArgumentException>(() =>
             _pathService.CalculateBlobDownloadPath(session, "container", blobName));
     }
 
@@ -144,7 +144,7 @@ public class PathServiceTests
     public void CalculateContainerDirectoryPath_NullSession_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
             _pathService.CalculateContainerDirectoryPath(null!, "container"));
     }
 
@@ -156,7 +156,7 @@ public class PathServiceTests
         var session = CreateTestSession("test", "/home/user");
 
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
             _pathService.CalculateContainerDirectoryPath(session, null!));
     }
 
@@ -170,7 +170,7 @@ public class PathServiceTests
         var session = CreateTestSession("test", "/home/user");
 
         // Act & Assert
-        Assert.Throws<ArgumentException>(() => 
+        Assert.Throws<ArgumentException>(() =>
             _pathService.CalculateContainerDirectoryPath(session, containerName));
     }
 
@@ -204,7 +204,7 @@ public class PathServiceTests
     public void EnsureDirectoryExists_NullFilePath_ThrowsArgumentException()
     {
         // Act & Assert
-        Assert.Throws<ArgumentException>(() => 
+        Assert.Throws<ArgumentException>(() =>
             _pathService.EnsureDirectoryExists(null!));
     }
 
@@ -213,7 +213,7 @@ public class PathServiceTests
     public void EnsureDirectoryExists_EmptyFilePath_ThrowsArgumentException()
     {
         // Act & Assert
-        Assert.Throws<ArgumentException>(() => 
+        Assert.Throws<ArgumentException>(() =>
             _pathService.EnsureDirectoryExists(""));
     }
 
@@ -279,7 +279,7 @@ public class PathServiceTests
     public void CleanupEmptyDirectories_NullFilePath_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
             _pathService.CleanupEmptyDirectories(null!, "/session"));
     }
 
@@ -288,7 +288,7 @@ public class PathServiceTests
     public void CleanupEmptyDirectories_NullSessionDirectory_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
             _pathService.CleanupEmptyDirectories("/path/file.txt", null!));
     }
 
@@ -307,7 +307,7 @@ public class PathServiceTests
         {
             // Create directory structure
             Directory.CreateDirectory(subDir2);
-            
+
             // Act
             var result = _pathService.CleanupEmptyDirectories(filePath, sessionDir);
 
@@ -410,7 +410,7 @@ public class PathServiceTests
     public void PreserveVirtualDirectoryStructure_NullBlobName_ThrowsArgumentNullException()
     {
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
             _pathService.PreserveVirtualDirectoryStructure(null!));
     }
 

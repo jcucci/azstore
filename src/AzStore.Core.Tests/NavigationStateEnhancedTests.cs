@@ -1,5 +1,6 @@
 using Xunit;
 using AzStore.Core.Models;
+using AzStore.Core.Models.Navigation;
 
 namespace AzStore.Core.Tests;
 

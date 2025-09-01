@@ -1,3 +1,6 @@
+using AzStore.Terminal.Events;
+using AzStore.Terminal.Input;
+using AzStore.Terminal.Navigation;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using Xunit;
@@ -59,7 +62,7 @@ public class VimNavigatorTests
     public void ExitMode_ReturnsToInitialMode()
     {
         _navigator.SwitchMode(NavigationMode.Command);
-        
+
         var result = _navigator.ExitMode();
 
         Assert.True(result);
@@ -234,7 +237,7 @@ public class VimNavigatorTests
     public void Reset_RaisesModeChangedEvent()
     {
         _navigator.SwitchMode(NavigationMode.Command);
-        
+
         NavigationModeChangedEventArgs? capturedArgs = null;
         _navigator.ModeChanged += (_, args) => capturedArgs = args;
 
@@ -284,18 +287,18 @@ public class VimNavigatorTests
     public void AppendToCommand_RespectsCcommandLengthLimit()
     {
         _navigator.EnterCommandMode();
-        
+
         // Fill command to near maximum length (256 - 1 for the prefix)
         for (int i = 0; i < 255; i++)
         {
             var result = _navigator.AppendToCommand('x');
             Assert.True(result, $"Failed to append character {i}");
         }
-        
+
         // This should fail due to length limit
         var failResult = _navigator.AppendToCommand('y');
         Assert.False(failResult);
-        
+
         // Verify command length is still at limit
         Assert.Equal(256, _navigator.PendingCommand?.Length);
     }
