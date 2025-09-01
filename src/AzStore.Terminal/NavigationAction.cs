@@ -23,7 +23,7 @@ public enum NavigationAction
     JumpToTop,
     /// <summary>Jump to bottom of list (G key)</summary>
     JumpToBottom,
-    /// <summary>Download selected item (dd keys)</summary>
+    /// <summary>Download selected item (d keys)</summary>
     Download,
     /// <summary>Cancel current operation or clear input (Escape key)</summary>
     Cancel

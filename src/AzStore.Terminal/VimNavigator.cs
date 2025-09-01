@@ -168,7 +168,10 @@ public class VimNavigator
             KeyBindingAction.Bottom or
             KeyBindingAction.Download or
             KeyBindingAction.Search or
-            KeyBindingAction.Command => true,
+            KeyBindingAction.Command or
+            KeyBindingAction.Refresh or
+            KeyBindingAction.Info or
+            KeyBindingAction.Help => true,
             _ => false
         },
         NavigationMode.Command => action == KeyBindingAction.Command,

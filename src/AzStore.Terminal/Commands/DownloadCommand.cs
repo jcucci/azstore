@@ -175,9 +175,9 @@ public class DownloadCommand : ICommand
     private static void DisplayProgress(BlobDownloadProgress progress)
     {
         var progressBar = CreateProgressBar(progress.ProgressPercentage, 40);
-        var speed = FormatBytes(progress.BytesPerSecond);
-        var downloaded = FormatBytes(progress.DownloadedBytes);
-        var total = FormatBytes(progress.TotalBytes);
+        var speed = TerminalUtils.FormatBytes(progress.BytesPerSecond);
+        var downloaded = TerminalUtils.FormatBytes(progress.DownloadedBytes);
+        var total = TerminalUtils.FormatBytes(progress.TotalBytes);
         var eta = progress.EstimatedTimeRemainingSeconds.HasValue
             ? TimeSpan.FromSeconds(progress.EstimatedTimeRemainingSeconds.Value).ToString(@"mm\:ss")
             : "--:--";
@@ -195,7 +195,7 @@ public class DownloadCommand : ICommand
             : 0;
 
         var progressBar = CreateProgressBar(percentage, 40);
-        var totalBytes = FormatBytes(progress.TotalBytesDownloaded);
+        var totalBytes = TerminalUtils.FormatBytes(progress.TotalBytesDownloaded);
 
         Console.Write($"\r{progressBar} {percentage:F1}% ({progress.CompletedBlobs}/{progress.TotalBlobs} files) {totalBytes} - {progress.CurrentBlobName}");
     }
@@ -207,18 +207,6 @@ public class DownloadCommand : ICommand
         return $"[{new string('=', filled)}{new string('-', empty)}]";
     }
 
-    private static string FormatBytes(long bytes)
-    {
-        string[] sizes = ["B", "KB", "MB", "GB", "TB"];
-        double len = bytes;
-        int order = 0;
-        while (len >= 1024 && order < sizes.Length - 1)
-        {
-            order++;
-            len /= 1024;
-        }
-        return $"{len:F1} {sizes[order]}";
-    }
 
     /// <summary>
     /// Calculates the target path for a blob download, using session-aware paths when appropriate.

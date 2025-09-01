@@ -181,7 +181,7 @@ public class BlobBrowserView : View
         var itemCount = _currentItems.Count;
         var selectedIndex = _listView?.SelectedItem ?? 0;
 
-        var statusText = $"{level} | {itemCount} items | Selected: {selectedIndex + 1}/{itemCount} | j/k:nav l:enter h:back gg:top G:bottom dd:download";
+        var statusText = $"{level} | {itemCount} items | Selected: {selectedIndex + 1}/{itemCount} | j/k:nav l:enter h:back gg:top G:bottom d:download";
         _statusLabel.Text = statusText;
         _defaultStatusText = statusText;
     }

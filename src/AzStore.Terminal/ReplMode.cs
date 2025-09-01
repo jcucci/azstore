@@ -8,7 +8,7 @@ public enum ReplMode
     /// <summary>
     /// Navigation mode for browsing containers and blobs with VIM-like key bindings.
     /// In this mode, single keys like 'j', 'k', 'l', 'h' control navigation.
-    /// Multi-character sequences like 'gg', 'G', 'dd' trigger special actions.
+    /// Multi-character sequences like 'gg', 'G' trigger special actions.
     /// Pressing ':' switches to command mode.
     /// </summary>
     Navigation,

@@ -23,6 +23,11 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ISessionManager, SessionManager>();
         services.AddSingleton<VimNavigator>();
         services.AddSingleton<INavigationEngine, NavigationEngine>();
+        services.AddSingleton<HelpTextGenerator>(provider =>
+        {
+            var settings = provider.GetRequiredService<IOptions<AzStoreSettings>>();
+            return new HelpTextGenerator(settings.Value.KeyBindings);
+        });
         services.AddSingleton<IReplEngine, ReplEngine>();
         services.AddSingleton<IInputHandler>(provider =>
         {

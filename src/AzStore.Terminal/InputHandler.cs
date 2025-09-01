@@ -46,7 +46,10 @@ public class InputHandler : IInputHandler
             { KeyBindingAction.Command, _keyBindings.Command },
             { KeyBindingAction.Top, _keyBindings.Top },
             { KeyBindingAction.Bottom, _keyBindings.Bottom },
-            { KeyBindingAction.Download, _keyBindings.Download }
+            { KeyBindingAction.Download, _keyBindings.Download },
+            { KeyBindingAction.Refresh, _keyBindings.Refresh },
+            { KeyBindingAction.Info, _keyBindings.Info },
+            { KeyBindingAction.Help, _keyBindings.Help }
         };
     }
 
@@ -116,7 +119,7 @@ public class InputHandler : IInputHandler
 
         // Convert key to character for sequence processing
         var keyChar = (char)(uint)keyEvent;
-        
+
         // Terminal.Gui encodes A-Z keys as KeyCode.A-Z, but uses ShiftMask to distinguish case:
         // - lowercase 'a'-'z': KeyCode.A-Z without ShiftMask
         // - uppercase 'A'-'Z': KeyCode.A-Z with ShiftMask
@@ -181,10 +184,13 @@ public class InputHandler : IInputHandler
         {
             NavigationAction.Command when keyBindingAction == KeyBindingAction.Search =>
                 new NavigationResult(action, Command: "/", KeyBindingAction: keyBindingAction),
+
             NavigationAction.Command when keyBindingAction == KeyBindingAction.Command =>
                 new NavigationResult(action, Command: ":", KeyBindingAction: keyBindingAction),
+
             NavigationAction.Command when !string.IsNullOrEmpty(command) =>
                 new NavigationResult(action, Command: command, KeyBindingAction: keyBindingAction),
+
             _ => new NavigationResult(action, selectedIndex, KeyBindingAction: keyBindingAction)
         };
 

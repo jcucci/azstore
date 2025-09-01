@@ -124,6 +124,7 @@ public class AuthenticationServiceTests
     }
 
     [Fact]
+    [Trait("Category", "Integration")]
     public async Task GetStorageAccountsAsync_ThrowsUnauthorizedWhenNotAuthenticated()
     {
         var service = AuthenticationServiceFixture.CreateWithMockLogger();
