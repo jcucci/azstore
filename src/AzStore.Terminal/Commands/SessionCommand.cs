@@ -85,15 +85,15 @@ public class SessionCommand : ICommand
 
             if (string.IsNullOrEmpty(storageAccountName))
             {
-                var accounts = await _authService.GetStorageAccountsAsync(authResult.SubscriptionId.Value, cancellationToken);
-                if (!accounts.Any())
+                var accounts = (await _authService.GetStorageAccountsAsync(authResult.SubscriptionId.Value, cancellationToken)).ToList();
+                if (accounts.Count == 0)
                 {
                     return CommandResult.Error("No storage accounts found. Please authenticate first.");
                 }
 
-                if (accounts.Count() == 1)
+                if (accounts.Count == 1)
                 {
-                    storageAccountName = accounts.First().AccountName;
+                    storageAccountName = accounts[0].AccountName;
                 }
                 else
                 {
@@ -132,10 +132,10 @@ public class SessionCommand : ICommand
     {
         try
         {
-            var sessions = _sessionManager.GetAllSessions();
+            var sessions = _sessionManager.GetAllSessions().ToList();
             var activeSession = _sessionManager.GetActiveSession();
 
-            if (!sessions.Any())
+            if (sessions.Count == 0)
             {
                 return CommandResult.Ok("No sessions found. Use ':session create' to create a new session.");
             }

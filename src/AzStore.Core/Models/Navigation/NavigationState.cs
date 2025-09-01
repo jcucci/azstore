@@ -105,7 +105,9 @@ public record NavigationState(
         {
             var lastSlash = BlobPrefix.LastIndexOf('/');
             var newPrefix = lastSlash > 0 ? BlobPrefix[..lastSlash] : null;
-            return CreateInContainer(SessionName, StorageAccountName, ContainerName!, newPrefix);
+            return ContainerName is not null
+                ? CreateInContainer(SessionName, StorageAccountName, ContainerName, newPrefix)
+                : this;
         }
 
         if (ContainerName != null)

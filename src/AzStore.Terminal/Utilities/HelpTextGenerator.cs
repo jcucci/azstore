@@ -60,7 +60,7 @@ public class HelpTextGenerator
         sb.AppendLine("  :help    Show available commands");
         sb.AppendLine("  :exit    Exit application");
         sb.AppendLine("  :q       Quick exit");
-        sb.AppendLine("  :ls      List items in current location");
+        sb.AppendLine("  :ls      List downloaded files for current session");
         sb.AppendLine("  :download <item> Download specific item");
         sb.AppendLine();
 
@@ -228,7 +228,7 @@ public class HelpTextGenerator
         sb.AppendLine("  help         Show command help");
         sb.AppendLine("  exit, quit   Exit application");
         sb.AppendLine("  q            Quick exit");
-        sb.AppendLine("  ls, list     List current items");
+        sb.AppendLine("  ls, list     List downloaded files");
         sb.AppendLine("  download     Download selected or specified item");
         sb.AppendLine("  session      Show session information");
         sb.AppendLine();
