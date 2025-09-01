@@ -61,19 +61,19 @@ public class KeySequenceBufferTests
     }
 
     [Fact]
-    public void AddKey_DifferentTwoCharacterSequence_ReturnsCompleteMatch()
+    public void AddKey_TwoCharacterSequence_ReturnsCompleteMatch()
     {
         var buffer = new KeySequenceBuffer();
 
-        // First 'd'
-        var firstResult = buffer.AddKey('d', _testBindings);
+        // First 'g' - should have partial match since 'gg' exists
+        var firstResult = buffer.AddKey('g', _testBindings);
         Assert.False(firstResult.isComplete);
         Assert.True(firstResult.hasPartialMatch);
 
-        // Second 'd'
-        var secondResult = buffer.AddKey('d', _testBindings);
+        // Second 'g' - should complete 'gg' sequence
+        var secondResult = buffer.AddKey('g', _testBindings);
         Assert.True(secondResult.isComplete);
-        Assert.Equal(KeyBindingAction.Download, secondResult.matchedBinding);
+        Assert.Equal(KeyBindingAction.Top, secondResult.matchedBinding);
         Assert.False(secondResult.hasPartialMatch);
     }
 

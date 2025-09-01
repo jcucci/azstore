@@ -22,9 +22,9 @@ public class TerminalProgressRenderer
     public static string RenderBlobDownloadProgress(BlobDownloadProgress progress, int progressBarWidth = DefaultProgressBarWidth)
     {
         var progressBar = CreateProgressBar(progress.ProgressPercentage, progressBarWidth);
-        var speed = FormatBytes(progress.BytesPerSecond);
-        var downloaded = FormatBytes(progress.DownloadedBytes);
-        var total = FormatBytes(progress.TotalBytes);
+        var speed = TerminalUtils.FormatBytes(progress.BytesPerSecond);
+        var downloaded = TerminalUtils.FormatBytes(progress.DownloadedBytes);
+        var total = TerminalUtils.FormatBytes(progress.TotalBytes);
         var eta = progress.EstimatedTimeRemainingSeconds.HasValue
             ? TimeSpan.FromSeconds(progress.EstimatedTimeRemainingSeconds.Value).ToString(@"mm\:ss")
             : "--:--";
@@ -48,7 +48,7 @@ public class TerminalProgressRenderer
             : 0;
 
         var progressBar = CreateProgressBar(percentage, progressBarWidth);
-        var totalBytes = FormatBytes(progress.TotalBytesDownloaded);
+        var totalBytes = TerminalUtils.FormatBytes(progress.TotalBytesDownloaded);
         var currentFile = string.IsNullOrEmpty(progress.CurrentBlobName) 
             ? "Preparing..." 
             : Path.GetFileName(progress.CurrentBlobName);
@@ -118,7 +118,7 @@ public class TerminalProgressRenderer
         // Size information
         if (item is Blob blob && blob.Size.HasValue)
         {
-            sb.AppendLine($"Size: {FormatBytes(blob.Size.Value)}");
+            sb.AppendLine($"Size: {TerminalUtils.FormatBytes(blob.Size.Value)}");
             sb.AppendLine($"Type: {blob.BlobType} Blob");
         }
         else if (item is Container)
@@ -176,31 +176,13 @@ public class TerminalProgressRenderer
         if (filled > 0 && filled < width)
         {
             filled--;
+            empty = width - filled - 1; // Recalculate empty to account for ProgressChar
             return $"[{new string(FilledChar, filled)}{ProgressChar}{new string(UnfilledChar, empty)}]";
         }
         
         return $"[{new string(FilledChar, filled)}{new string(UnfilledChar, empty)}]";
     }
 
-    /// <summary>
-    /// Formats bytes into human-readable format.
-    /// </summary>
-    /// <param name="bytes">Number of bytes to format.</param>
-    /// <returns>Formatted byte string (e.g., "1.5 MB").</returns>
-    private static string FormatBytes(long bytes)
-    {
-        string[] sizes = ["B", "KB", "MB", "GB", "TB"];
-        double len = bytes;
-        int order = 0;
-        
-        while (len >= 1024 && order < sizes.Length - 1)
-        {
-            order++;
-            len /= 1024;
-        }
-        
-        return $"{len:F1} {sizes[order]}";
-    }
 
     /// <summary>
     /// Gets a spinning character for indeterminate progress.

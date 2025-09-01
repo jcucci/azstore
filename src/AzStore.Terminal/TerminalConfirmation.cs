@@ -77,7 +77,7 @@ public class TerminalConfirmation
     /// <returns>The user's confirmation choice.</returns>
     public static ConfirmationResult ShowDownloadConfirmation(string fileName, long? fileSize = null)
     {
-        var sizeText = fileSize.HasValue ? $" ({FormatBytes(fileSize.Value)})" : "";
+        var sizeText = fileSize.HasValue ? $" ({TerminalUtils.FormatBytes(fileSize.Value)})" : "";
         var message = $"Download '{fileName}'{sizeText}?";
         
         return ShowConfirmation(message);
@@ -166,25 +166,6 @@ public class TerminalConfirmation
         return ShowCustomConfirmation(message, options, 'S'); // Default to Skip
     }
 
-    /// <summary>
-    /// Formats bytes into human-readable format.
-    /// </summary>
-    /// <param name="bytes">Number of bytes to format.</param>
-    /// <returns>Formatted byte string.</returns>
-    private static string FormatBytes(long bytes)
-    {
-        string[] sizes = ["B", "KB", "MB", "GB", "TB"];
-        double len = bytes;
-        int order = 0;
-        
-        while (len >= 1024 && order < sizes.Length - 1)
-        {
-            order++;
-            len /= 1024;
-        }
-        
-        return $"{len:F1} {sizes[order]}";
-    }
 
     /// <summary>
     /// Waits for any key press and returns the pressed key.

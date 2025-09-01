@@ -248,7 +248,7 @@ public class NavigationEngine : INavigationEngine
                     Console.WriteLine($"{prefix}📁 {item.Name}");
                     break;
                 case NavigationItemType.BlobFile:
-                    Console.WriteLine($"{prefix}📄 {item.Name} ({FormatSize(item.Size ?? 0)})");
+                    Console.WriteLine($"{prefix}📄 {item.Name} ({TerminalUtils.FormatSize(item.Size ?? 0)})");
                     break;
                 case NavigationItemType.BlobPrefix:
                     Console.WriteLine($"{prefix}📁 {item.Name}/");
@@ -480,7 +480,7 @@ public class NavigationEngine : INavigationEngine
 
             if (result.Success)
             {
-                var sizeText = result.BytesDownloaded > 0 ? $" ({FormatBytes(result.BytesDownloaded)})" : "";
+                var sizeText = result.BytesDownloaded > 0 ? $" ({TerminalUtils.FormatBytes(result.BytesDownloaded)})" : "";
                 NavigationError?.Invoke(this, new NavigationErrorEventArgs(
                     $"✓ Downloaded '{selectedItem.Name}'{sizeText} to {result.LocalFilePath}"));
 
@@ -671,35 +671,6 @@ Press any key to return...";
         };
     }
 
-    private static string FormatBytes(long bytes)
-    {
-        string[] sizes = ["B", "KB", "MB", "GB", "TB"];
-        double len = bytes;
-        int order = 0;
-
-        while (len >= 1024 && order < sizes.Length - 1)
-        {
-            order++;
-            len /= 1024;
-        }
-
-        return $"{len:F1} {sizes[order]}";
-    }
-
-    private static string FormatSize(long bytes)
-    {
-        string[] sizes = ["B", "KB", "MB", "GB", "TB"];
-        double len = bytes;
-        int order = 0;
-
-        while (len >= 1024 && order < sizes.Length - 1)
-        {
-            order++;
-            len /= 1024;
-        }
-
-        return $"{len:0.##} {sizes[order]}";
-    }
 
     private void OnVimNavigatorModeChanged(object? sender, NavigationModeChangedEventArgs e)
     {
