@@ -1,5 +1,7 @@
 using AzStore.Core.Models;
+using AzStore.Core.Models.Storage;
 using AzStore.Terminal;
+using AzStore.Terminal.Navigation;
 using Xunit;
 
 namespace AzStore.Terminal.Tests;
@@ -11,7 +13,7 @@ public class NavigationResultTests
     public void NavigationResult_WithActionOnly_CreatesCorrectly()
     {
         var result = new NavigationResult(NavigationAction.Exit);
-        
+
         Assert.Equal(NavigationAction.Exit, result.Action);
         Assert.Null(result.SelectedIndex);
         Assert.Null(result.SelectedItem);
@@ -22,7 +24,7 @@ public class NavigationResultTests
     public void NavigationResult_WithActionAndIndex_CreatesCorrectly()
     {
         var result = new NavigationResult(NavigationAction.Enter, 5);
-        
+
         Assert.Equal(NavigationAction.Enter, result.Action);
         Assert.Equal(5, result.SelectedIndex);
         Assert.Null(result.SelectedItem);
@@ -34,7 +36,7 @@ public class NavigationResultTests
     {
         var container = Container.Create("test-container", "/test-container");
         var result = new NavigationResult(NavigationAction.Enter, 2, container);
-        
+
         Assert.Equal(NavigationAction.Enter, result.Action);
         Assert.Equal(2, result.SelectedIndex);
         Assert.Equal(container, result.SelectedItem);
@@ -45,7 +47,7 @@ public class NavigationResultTests
     public void NavigationResult_WithCommand_CreatesCorrectly()
     {
         var result = new NavigationResult(NavigationAction.Command, Command: ":help");
-        
+
         Assert.Equal(NavigationAction.Command, result.Action);
         Assert.Null(result.SelectedIndex);
         Assert.Null(result.SelectedItem);
@@ -57,7 +59,7 @@ public class NavigationResultTests
     {
         var blob = Blob.Create("test.txt", "/test.txt", "container", BlobType.BlockBlob, 1024);
         var result = new NavigationResult(NavigationAction.Enter, 3, blob, "/search");
-        
+
         Assert.Equal(NavigationAction.Enter, result.Action);
         Assert.Equal(3, result.SelectedIndex);
         Assert.Equal(blob, result.SelectedItem);
@@ -71,7 +73,7 @@ public class NavigationResultTests
         var result1 = new NavigationResult(NavigationAction.Enter, 1, container, "test");
         var result2 = new NavigationResult(NavigationAction.Enter, 1, container, "test");
         var result3 = new NavigationResult(NavigationAction.Back, 1, container, "test");
-        
+
         Assert.Equal(result1, result2);
         Assert.NotEqual(result1, result3);
     }
@@ -82,7 +84,7 @@ public class NavigationResultTests
         var container = Container.Create("test-container", "/test-container");
         var result1 = new NavigationResult(NavigationAction.Enter, 1, container);
         var result2 = new NavigationResult(NavigationAction.Enter, 1, container);
-        
+
         Assert.Equal(result1.GetHashCode(), result2.GetHashCode());
     }
 
@@ -91,7 +93,7 @@ public class NavigationResultTests
     {
         var result = new NavigationResult(NavigationAction.Refresh);
         var stringResult = result.ToString();
-        
+
         Assert.Contains("Refresh", stringResult);
         Assert.Contains("NavigationResult", stringResult);
     }
@@ -107,7 +109,7 @@ public class NavigationResultTests
     public void NavigationResult_SupportsAllNavigationActions(NavigationAction action)
     {
         var result = new NavigationResult(action);
-        
+
         Assert.Equal(action, result.Action);
     }
 
@@ -116,7 +118,7 @@ public class NavigationResultTests
     {
         var blob = Blob.Create("document.pdf", "/document.pdf", "container", BlobType.PageBlob, 2048);
         var result = new NavigationResult(NavigationAction.Enter, 0, blob);
-        
+
         Assert.Equal(blob, result.SelectedItem);
         Assert.IsType<Blob>(result.SelectedItem);
         Assert.Equal("document.pdf", result.SelectedItem.Name);
@@ -127,7 +129,7 @@ public class NavigationResultTests
     {
         var container = Container.Create("my-container", "/my-container");
         var result = new NavigationResult(NavigationAction.Enter, 1, container);
-        
+
         Assert.Equal(container, result.SelectedItem);
         Assert.IsType<Container>(result.SelectedItem);
         Assert.Equal("my-container", result.SelectedItem.Name);

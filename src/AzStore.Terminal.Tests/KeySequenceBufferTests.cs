@@ -1,4 +1,5 @@
 using AzStore.Terminal;
+using AzStore.Terminal.Input;
 using Xunit;
 
 namespace AzStore.Terminal.Tests;

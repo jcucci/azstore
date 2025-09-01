@@ -1,4 +1,5 @@
 using AzStore.Terminal;
+using AzStore.Terminal.Repl;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 

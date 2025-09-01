@@ -1,4 +1,4 @@
-using AzStore.Core.Models;
+using AzStore.Core.Models.Downloads;
 using Xunit;
 
 namespace AzStore.Core.Tests.Models;

@@ -1,7 +1,8 @@
 using AzStore.Configuration;
-using AzStore.Core;
-using AzStore.Terminal;
+using AzStore.Core.Services.Abstractions;
 using AzStore.Terminal.Commands;
+using AzStore.Terminal.Navigation;
+using AzStore.Terminal.Repl;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -19,9 +20,9 @@ public class ReplEngineCommandTests
         var commandRegistry = Substitute.For<ICommandRegistry>();
         var sessionManager = Substitute.For<ISessionManager>();
         var navigationEngine = Substitute.For<INavigationEngine>();
-        
+
         var replEngine = new ReplEngine(settings, logger, commandRegistry, sessionManager, navigationEngine);
-        
+
         Assert.NotNull(replEngine);
     }
 
@@ -29,7 +30,7 @@ public class ReplEngineCommandTests
     public void ParseCommandArgs_WithSimpleCommand_ReturnsEmptyArray()
     {
         var result = InvokeParseCommandArgs(":help");
-        
+
         Assert.Empty(result);
     }
 
@@ -37,7 +38,7 @@ public class ReplEngineCommandTests
     public void ParseCommandArgs_WithArguments_ReturnsArguments()
     {
         var result = InvokeParseCommandArgs(":command arg1 arg2 arg3");
-        
+
         Assert.Equal(new[] { "arg1", "arg2", "arg3" }, result);
     }
 
@@ -45,7 +46,7 @@ public class ReplEngineCommandTests
     public void ParseCommandArgs_WithExtraSpaces_IgnoresExtraSpaces()
     {
         var result = InvokeParseCommandArgs(":command  arg1   arg2  ");
-        
+
         Assert.Equal(new[] { "arg1", "arg2" }, result);
     }
 
@@ -53,7 +54,7 @@ public class ReplEngineCommandTests
     public void ParseCommandArgs_WithEmptyInput_ReturnsEmptyArray()
     {
         var result = InvokeParseCommandArgs("");
-        
+
         Assert.Empty(result);
     }
 
@@ -68,12 +69,12 @@ public class ReplEngineCommandTests
     private static string[] InvokeParseCommandArgs(string input)
     {
         var type = typeof(ReplEngine);
-        var method = type.GetMethod("ParseCommandArgs", 
+        var method = type.GetMethod("ParseCommandArgs",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
-        
+
         if (method == null)
             throw new InvalidOperationException("ParseCommandArgs method not found");
-            
+
         var result = method.Invoke(null, new object[] { input });
         return (string[])(result ?? Array.Empty<string>());
     }

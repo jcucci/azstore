@@ -1,6 +1,9 @@
 using AzStore.Configuration;
-using AzStore.Core.Models;
-using AzStore.Terminal;
+using AzStore.Core.Models.Navigation;
+using AzStore.Core.Models.Storage;
+using AzStore.Terminal.Input;
+using AzStore.Terminal.Navigation;
+using AzStore.Terminal.UI;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using Xunit;

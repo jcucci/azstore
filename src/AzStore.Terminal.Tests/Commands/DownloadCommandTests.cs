@@ -1,5 +1,7 @@
 using AzStore.Core;
 using AzStore.Core.Models;
+using AzStore.Core.Models.Downloads;
+using AzStore.Core.Services.Abstractions;
 using AzStore.Terminal.Commands;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
@@ -49,12 +51,12 @@ public class DownloadCommandTests
     {
         var args = new[] { "container", "blob.txt", "/local/path" };
         var expectedResult = new DownloadResult("blob.txt", "/local/path", 1024, true);
-        
+
         _storageService.DownloadBlobWithProgressAsync(
-            "container", 
-            "blob.txt", 
-            "/local/path", 
-            Arg.Any<DownloadOptions>(), 
+            "container",
+            "blob.txt",
+            "/local/path",
+            Arg.Any<DownloadOptions>(),
             Arg.Any<IProgress<BlobDownloadProgress>>(),
             Arg.Any<CancellationToken>())
             .Returns(expectedResult);
@@ -63,12 +65,12 @@ public class DownloadCommandTests
 
         Assert.True(result.Success);
         Assert.Contains("Successfully downloaded", result.Message);
-        
+
         await _storageService.Received(1).DownloadBlobWithProgressAsync(
-            "container", 
-            "blob.txt", 
-            "/local/path", 
-            Arg.Any<DownloadOptions>(), 
+            "container",
+            "blob.txt",
+            "/local/path",
+            Arg.Any<DownloadOptions>(),
             Arg.Any<IProgress<BlobDownloadProgress>>(),
             Arg.Any<CancellationToken>());
     }
@@ -83,12 +85,12 @@ public class DownloadCommandTests
             new DownloadResult("blob1.txt", Path.Combine(tempPath, "blob1.txt"), 1024, true),
             new DownloadResult("blob2.txt", Path.Combine(tempPath, "blob2.txt"), 512, true)
         };
-        
+
         _storageService.DownloadBlobsAsync(
-            "container", 
-            "*.txt", 
-            tempPath, 
-            Arg.Any<DownloadOptions>(), 
+            "container",
+            "*.txt",
+            tempPath,
+            Arg.Any<DownloadOptions>(),
             Arg.Any<IProgress<DownloadProgress>>(),
             Arg.Any<CancellationToken>())
             .Returns(expectedResults);
@@ -104,12 +106,12 @@ public class DownloadCommandTests
     {
         var args = new[] { "container", "blob.txt", "/local/path", "--overwrite" };
         var expectedResult = new DownloadResult("blob.txt", "/local/path/blob.txt", 1024, true);
-        
+
         _storageService.DownloadBlobWithProgressAsync(
-            Arg.Any<string>(), 
-            Arg.Any<string>(), 
-            Arg.Any<string>(), 
-            Arg.Is<DownloadOptions>(o => o.ConflictResolution == ConflictResolution.Overwrite), 
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Is<DownloadOptions>(o => o.ConflictResolution == ConflictResolution.Overwrite),
             Arg.Any<IProgress<BlobDownloadProgress>>(),
             Arg.Any<CancellationToken>())
             .Returns(expectedResult);
@@ -124,12 +126,12 @@ public class DownloadCommandTests
     {
         var args = new[] { "container", "blob.txt", "/local/path", "--skip" };
         var expectedResult = new DownloadResult("blob.txt", "/local/path/blob.txt", 1024, true);
-        
+
         _storageService.DownloadBlobWithProgressAsync(
-            Arg.Any<string>(), 
-            Arg.Any<string>(), 
-            Arg.Any<string>(), 
-            Arg.Is<DownloadOptions>(o => o.ConflictResolution == ConflictResolution.Skip), 
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Is<DownloadOptions>(o => o.ConflictResolution == ConflictResolution.Skip),
             Arg.Any<IProgress<BlobDownloadProgress>>(),
             Arg.Any<CancellationToken>())
             .Returns(expectedResult);
@@ -144,12 +146,12 @@ public class DownloadCommandTests
     {
         var args = new[] { "container", "blob.txt", "/local/path", "--rename" };
         var expectedResult = new DownloadResult("blob.txt", "/local/path/blob.txt", 1024, true);
-        
+
         _storageService.DownloadBlobWithProgressAsync(
-            Arg.Any<string>(), 
-            Arg.Any<string>(), 
-            Arg.Any<string>(), 
-            Arg.Is<DownloadOptions>(o => o.ConflictResolution == ConflictResolution.Rename), 
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Is<DownloadOptions>(o => o.ConflictResolution == ConflictResolution.Rename),
             Arg.Any<IProgress<BlobDownloadProgress>>(),
             Arg.Any<CancellationToken>())
             .Returns(expectedResult);
@@ -164,12 +166,12 @@ public class DownloadCommandTests
     {
         var args = new[] { "container", "blob.txt", "/local/path", "--no-verify" };
         var expectedResult = new DownloadResult("blob.txt", "/local/path/blob.txt", 1024, true);
-        
+
         _storageService.DownloadBlobWithProgressAsync(
-            Arg.Any<string>(), 
-            Arg.Any<string>(), 
-            Arg.Any<string>(), 
-            Arg.Is<DownloadOptions>(o => !o.VerifyChecksum), 
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Is<DownloadOptions>(o => !o.VerifyChecksum),
             Arg.Any<IProgress<BlobDownloadProgress>>(),
             Arg.Any<CancellationToken>())
             .Returns(expectedResult);
@@ -185,12 +187,12 @@ public class DownloadCommandTests
         var args = new[] { "container", "blob.txt", "/local/path", "--limit", "10" };
         var expectedResult = new DownloadResult("blob.txt", "/local/path/blob.txt", 1024, true);
         var expectedLimit = 10 * 1024 * 1024; // 10 MB/s in bytes/s
-        
+
         _storageService.DownloadBlobWithProgressAsync(
-            Arg.Any<string>(), 
-            Arg.Any<string>(), 
-            Arg.Any<string>(), 
-            Arg.Is<DownloadOptions>(o => o.BandwidthLimitBytesPerSecond == expectedLimit), 
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Is<DownloadOptions>(o => o.BandwidthLimitBytesPerSecond == expectedLimit),
             Arg.Any<IProgress<BlobDownloadProgress>>(),
             Arg.Any<CancellationToken>())
             .Returns(expectedResult);
@@ -205,12 +207,12 @@ public class DownloadCommandTests
     {
         var args = new[] { "container", "blob.txt", "/local/path" };
         var expectedResult = new DownloadResult("blob.txt", "/local/path/blob.txt", 0, false, "Network error");
-        
+
         _storageService.DownloadBlobWithProgressAsync(
-            Arg.Any<string>(), 
-            Arg.Any<string>(), 
-            Arg.Any<string>(), 
-            Arg.Any<DownloadOptions>(), 
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<DownloadOptions>(),
             Arg.Any<IProgress<BlobDownloadProgress>>(),
             Arg.Any<CancellationToken>())
             .Returns(expectedResult);

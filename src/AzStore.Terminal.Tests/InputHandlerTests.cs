@@ -1,4 +1,5 @@
-using AzStore.Terminal;
+using AzStore.Terminal.Input;
+using AzStore.Terminal.Navigation;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using Terminal.Gui;
@@ -138,7 +139,7 @@ public class InputHandlerTests : IDisposable
     {
         // Test uppercase G directly - InputHandler should detect this as uppercase
         var result = _inputHandler.ProcessKeyEvent((Key)'G');
-        
+
         Assert.True(result);
         Assert.Single(_capturedResults);
         Assert.Equal(NavigationAction.JumpToBottom, _capturedResults[0].Action);
@@ -165,7 +166,7 @@ public class InputHandlerTests : IDisposable
     public void ProcessKeyEvent_JumpToBottomEmptyList_HandlesGracefully()
     {
         var result = _inputHandler.ProcessKeyEvent((Key)'G');
-        
+
         Assert.True(result);
         Assert.Single(_capturedResults);
         Assert.Equal(NavigationAction.JumpToBottom, _capturedResults[0].Action);
@@ -178,10 +179,10 @@ public class InputHandlerTests : IDisposable
         // Test gg (jump to top)
         _inputHandler.ProcessKeyEvent((Key)'g');
         _inputHandler.ProcessKeyEvent((Key)'g');
-        
+
         // Test G (jump to bottom)  
         _inputHandler.ProcessKeyEvent((Key)'G');
-        
+
         Assert.Equal(2, _capturedResults.Count);
         Assert.Equal(NavigationAction.JumpToTop, _capturedResults[0].Action);
         Assert.Equal(NavigationAction.JumpToBottom, _capturedResults[1].Action);

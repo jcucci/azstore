@@ -1,4 +1,5 @@
-using AzStore.Core.Models;
+using AzStore.Core.Models.Session;
+using AzStore.Core.Services.Implementations;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using Xunit;

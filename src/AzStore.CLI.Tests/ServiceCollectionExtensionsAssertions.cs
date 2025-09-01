@@ -1,5 +1,6 @@
-using AzStore.Core;
-using AzStore.Terminal;
+using AzStore.Core.Services.Abstractions;
+using AzStore.Terminal.Repl;
+using AzStore.Terminal.UI;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 

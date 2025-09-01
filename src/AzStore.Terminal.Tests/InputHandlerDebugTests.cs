@@ -1,4 +1,5 @@
 using AzStore.Terminal;
+using AzStore.Terminal.Input;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using Terminal.Gui;

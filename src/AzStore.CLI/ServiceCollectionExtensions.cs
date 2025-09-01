@@ -1,8 +1,14 @@
 using AzStore.Configuration;
+using AzStore.Core;
 using AzStore.Core.Services.Abstractions;
 using AzStore.Core.Services.Implementations;
 using AzStore.Terminal;
 using AzStore.Terminal.Commands;
+using AzStore.Terminal.Input;
+using AzStore.Terminal.Navigation;
+using AzStore.Terminal.Repl;
+using AzStore.Terminal.UI;
+using AzStore.Terminal.Utilities;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;

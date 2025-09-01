@@ -1,7 +1,10 @@
 using AzStore.Configuration;
 using AzStore.Core;
+using AzStore.Core.Services.Abstractions;
 using AzStore.Terminal;
 using AzStore.Terminal.Commands;
+using AzStore.Terminal.Navigation;
+using AzStore.Terminal.Repl;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -15,12 +18,12 @@ public static class ReplEngineFixture
         var settings = new AzStoreSettings();
         var options = Substitute.For<IOptions<AzStoreSettings>>();
         options.Value.Returns(settings);
-        
+
         var logger = Substitute.For<ILogger<ReplEngine>>();
         var commandRegistry = Substitute.For<ICommandRegistry>();
         var sessionManager = Substitute.For<ISessionManager>();
         var navigationEngine = Substitute.For<INavigationEngine>();
-        
+
         return new ReplEngine(options, logger, commandRegistry, sessionManager, navigationEngine);
     }
 
@@ -30,15 +33,15 @@ public static class ReplEngineFixture
         {
             Theme = new ThemeSettings { PromptColor = promptColor }
         };
-        
+
         var options = Substitute.For<IOptions<AzStoreSettings>>();
         options.Value.Returns(settings);
-        
+
         var logger = Substitute.For<ILogger<ReplEngine>>();
         var commandRegistry = Substitute.For<ICommandRegistry>();
         var sessionManager = Substitute.For<ISessionManager>();
         var navigationEngine = Substitute.For<INavigationEngine>();
-        
+
         return new ReplEngine(options, logger, commandRegistry, sessionManager, navigationEngine);
     }
 }
