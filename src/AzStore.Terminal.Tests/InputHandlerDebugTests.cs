@@ -16,10 +16,10 @@ public class InputHandlerDebugTests : IDisposable
         var logger = Substitute.For<ILogger<InputHandler>>();
         var keyBindings = new KeyBindingsConfig();
         var inputHandler = new InputHandler(logger, keyBindings);
-        
+
         // Debug the bindings
         var result = inputHandler.ProcessKeyEvent((Key)'j');
-        
+
         // Also test the KeySequenceBuffer directly
         var buffer = new KeySequenceBuffer(1000);
         var bindingsLookup = new Dictionary<KeyBindingAction, string>
@@ -32,11 +32,11 @@ public class InputHandlerDebugTests : IDisposable
             { KeyBindingAction.Command, ":" },
             { KeyBindingAction.Top, "gg" },
             { KeyBindingAction.Bottom, "G" },
-            { KeyBindingAction.Download, "dd" }
+            { KeyBindingAction.Download, "d" }
         };
-        
+
         var (isComplete, matchedBinding, hasPartialMatch) = buffer.AddKey('j', bindingsLookup);
-        
+
         // Log the results
         Assert.True(isComplete, $"Expected complete match for 'j', got isComplete: {isComplete}, matchedBinding: {matchedBinding}, hasPartialMatch: {hasPartialMatch}");
         Assert.Equal(KeyBindingAction.MoveDown, matchedBinding);

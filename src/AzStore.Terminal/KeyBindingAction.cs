@@ -22,5 +22,11 @@ public enum KeyBindingAction
     /// <summary>Jump to bottom of list</summary>
     Bottom,
     /// <summary>Download selected item</summary>
-    Download
+    Download,
+    /// <summary>Refresh the current view</summary>
+    Refresh,
+    /// <summary>Show item details/information</summary>
+    Info,
+    /// <summary>Show help/key bindings</summary>
+    Help
 }

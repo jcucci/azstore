@@ -13,6 +13,7 @@ public class NavigationEngine : INavigationEngine
     private readonly IStorageService _storageService;
     private readonly ILogger<NavigationEngine> _logger;
     private readonly VimNavigator _vimNavigator;
+    private readonly IPathService _pathService;
     private Session? _currentSession;
     private NavigationState? _currentState;
     private readonly List<NavigationItem> _currentItems = [];
@@ -52,11 +53,13 @@ public class NavigationEngine : INavigationEngine
     /// <param name="storageService">The storage service for accessing Azure Blob Storage.</param>
     /// <param name="logger">Logger instance for this service.</param>
     /// <param name="vimNavigator">The VIM navigator for modal state management.</param>
-    public NavigationEngine(IStorageService storageService, ILogger<NavigationEngine> logger, VimNavigator vimNavigator)
+    /// <param name="pathService">The path service for calculating download paths.</param>
+    public NavigationEngine(IStorageService storageService, ILogger<NavigationEngine> logger, VimNavigator vimNavigator, IPathService pathService)
     {
         _storageService = storageService ?? throw new ArgumentNullException(nameof(storageService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _vimNavigator = vimNavigator ?? throw new ArgumentNullException(nameof(vimNavigator));
+        _pathService = pathService ?? throw new ArgumentNullException(nameof(pathService));
 
         // Wire up VIM navigator events
         _vimNavigator.ModeChanged += OnVimNavigatorModeChanged;
@@ -107,6 +110,9 @@ public class NavigationEngine : INavigationEngine
                 KeyBindingAction.Top => JumpToTopAsync(),
                 KeyBindingAction.Bottom => JumpToBottomAsync(),
                 KeyBindingAction.Download => DownloadSelectedItemAsync(cancellationToken),
+                KeyBindingAction.Refresh => RefreshCurrentViewAsync(cancellationToken),
+                KeyBindingAction.Info => ShowItemDetailsAsync(cancellationToken),
+                KeyBindingAction.Help => ShowHelpAsync(cancellationToken),
                 KeyBindingAction.Command => HandleCommandModeAsync(),
                 _ => Task.CompletedTask
             });
@@ -387,24 +393,297 @@ public class NavigationEngine : INavigationEngine
         return Task.CompletedTask;
     }
 
-    private Task DownloadSelectedItemAsync(CancellationToken cancellationToken)
+    private async Task DownloadSelectedItemAsync(CancellationToken cancellationToken)
     {
         var selectedItem = SelectedItem;
         if (selectedItem?.Type != NavigationItemType.BlobFile || _currentState == null || _currentSession == null)
-            return Task.CompletedTask;
+        {
+            NavigationError?.Invoke(this, new NavigationErrorEventArgs("No blob file selected for download"));
+            return;
+        }
 
-        _logger.LogInformation("Download requested for blob: {BlobName}", selectedItem.Name);
+        try
+        {
+            _logger.LogInformation("Download requested for blob: {BlobName}", selectedItem.Name);
 
-        NavigationError?.Invoke(this, new NavigationErrorEventArgs(
-            $"Download functionality will be implemented in future phases. Selected: {selectedItem.Name}"));
+            // Get blob details for confirmation
+            var blob = await _storageService.GetBlobAsync(
+                _currentState.ContainerName!,
+                selectedItem.Path ?? selectedItem.Name,
+                cancellationToken);
 
-        return Task.CompletedTask;
+            if (blob == null)
+            {
+                NavigationError?.Invoke(this, new NavigationErrorEventArgs($"Blob '{selectedItem.Name}' not found"));
+                return;
+            }
+
+            // Show confirmation prompt
+            var confirmation = TerminalConfirmation.ShowDownloadConfirmation(selectedItem.Name, blob.Size);
+            if (confirmation != ConfirmationResult.Yes)
+            {
+                _logger.LogDebug("Download cancelled by user");
+                return;
+            }
+
+            // Calculate target path
+            var targetPath = _pathService.CalculateBlobDownloadPath(
+                _currentSession,
+                _currentState.ContainerName!,
+                selectedItem.Path ?? selectedItem.Name);
+
+            // Check for conflicts
+            if (File.Exists(targetPath))
+            {
+                var conflictResolution = TerminalConfirmation.ShowConflictResolutionPrompt(Path.GetFileName(targetPath));
+                switch (conflictResolution)
+                {
+                    case 'S': // Skip
+                        _logger.LogDebug("Download skipped due to file conflict");
+                        return;
+                    case 'R': // Rename
+                        targetPath = GenerateUniqueFileName(targetPath);
+                        break;
+                    case 'O': // Overwrite - use original path
+                        break;
+                    default: // Cancelled or unknown
+                        return;
+                }
+            }
+
+            // Ensure target directory exists
+            var targetDirectory = Path.GetDirectoryName(targetPath);
+            if (!string.IsNullOrEmpty(targetDirectory) && !Directory.Exists(targetDirectory))
+            {
+                Directory.CreateDirectory(targetDirectory);
+            }
+
+            // Create progress callback
+            var progress = new Progress<BlobDownloadProgress>(progressInfo =>
+            {
+                var progressText = TerminalProgressRenderer.RenderBlobDownloadProgress(progressInfo);
+                Console.Write($"\r{progressText}");
+                Console.Out.Flush();
+            });
+
+            // Perform download
+            var downloadOptions = DownloadOptions.Default;
+            var result = await _storageService.DownloadBlobWithProgressAsync(
+                _currentState.ContainerName!,
+                selectedItem.Path ?? selectedItem.Name,
+                targetPath,
+                downloadOptions,
+                progress,
+                cancellationToken);
+
+            Console.WriteLine(); // Move to next line after progress
+
+            if (result.Success)
+            {
+                var sizeText = result.BytesDownloaded > 0 ? $" ({FormatBytes(result.BytesDownloaded)})" : "";
+                NavigationError?.Invoke(this, new NavigationErrorEventArgs(
+                    $"✓ Downloaded '{selectedItem.Name}'{sizeText} to {result.LocalFilePath}"));
+
+                _logger.LogInformation("Successfully downloaded {BlobName} to {LocalPath}",
+                    selectedItem.Name, result.LocalFilePath);
+            }
+            else
+            {
+                NavigationError?.Invoke(this, new NavigationErrorEventArgs(
+                    $"✗ Failed to download '{selectedItem.Name}': {result.Error}"));
+
+                _logger.LogError("Failed to download {BlobName}: {Error}", selectedItem.Name, result.Error);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            NavigationError?.Invoke(this, new NavigationErrorEventArgs("Download cancelled"));
+            _logger.LogInformation("Download cancelled for blob: {BlobName}", selectedItem.Name);
+        }
+        catch (Exception ex)
+        {
+            NavigationError?.Invoke(this, new NavigationErrorEventArgs($"Download error: {ex.Message}"));
+            _logger.LogError(ex, "Error downloading blob: {BlobName}", selectedItem.Name);
+        }
     }
 
     private Task HandleCommandModeAsync()
     {
         _vimNavigator.EnterCommandMode();
         return Task.CompletedTask;
+    }
+
+    private async Task RefreshCurrentViewAsync(CancellationToken cancellationToken)
+    {
+        if (_currentState == null)
+            return;
+
+        try
+        {
+            _logger.LogInformation("Refreshing current navigation view");
+            var selectedIndex = _currentState.SelectedIndex;
+
+            // Clear page tokens to refresh from beginning
+            _previousPageTokens.Clear();
+
+            await LoadCurrentLevelAsync(cancellationToken);
+
+            // Restore selection if possible
+            if (selectedIndex < _currentItems.Count)
+            {
+                _currentState = _currentState.WithSelectedIndex(selectedIndex);
+            }
+
+            NavigationError?.Invoke(this, new NavigationErrorEventArgs("✓ View refreshed"));
+        }
+        catch (Exception ex)
+        {
+            NavigationError?.Invoke(this, new NavigationErrorEventArgs($"Refresh failed: {ex.Message}"));
+            _logger.LogError(ex, "Error refreshing current view");
+        }
+    }
+
+    private async Task ShowItemDetailsAsync(CancellationToken cancellationToken)
+    {
+        var selectedItem = SelectedItem;
+        if (selectedItem == null || _currentState == null)
+        {
+            NavigationError?.Invoke(this, new NavigationErrorEventArgs("No item selected"));
+            return;
+        }
+
+        try
+        {
+            StorageItem? detailItem = selectedItem.Type switch
+            {
+                NavigationItemType.BlobFile => await _storageService.GetBlobAsync(
+                    _currentState.ContainerName!,
+                    selectedItem.Path ?? selectedItem.Name,
+                    cancellationToken),
+                NavigationItemType.Container => await _storageService.GetContainerPropertiesAsync(
+                    selectedItem.Name,
+                    cancellationToken),
+                _ => null
+            };
+
+            var itemToShow = detailItem ?? CreateStorageItemFromNavigationItem(selectedItem, _currentState.ContainerName ?? "unknown");
+            var detailsText = TerminalProgressRenderer.RenderItemDetails(itemToShow);
+
+            Console.Clear();
+            Console.WriteLine(detailsText);
+            TerminalConfirmation.WaitForAnyKey();
+
+            // Note: In a real terminal app, we'd need to redraw the current view
+            // For now, just trigger a refresh
+            await RefreshCurrentViewAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            NavigationError?.Invoke(this, new NavigationErrorEventArgs($"Could not show item details: {ex.Message}"));
+            _logger.LogError(ex, "Error showing item details for: {ItemName}", selectedItem.Name);
+        }
+    }
+
+    private Task ShowHelpAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            // For now, we'll use a simple help display
+            // In the future, this could be integrated with HelpTextGenerator
+            var helpText = @"AzStore - Azure Blob Storage Terminal
+====================================
+
+NAVIGATION:
+  j/↓      Move down
+  k/↑      Move up  
+  l/Enter  Navigate into item
+  h        Navigate back
+  gg       Jump to top
+  G        Jump to bottom
+
+ACTIONS:
+  d       Download selected blob
+  i        Show item details
+  r        Refresh current view
+  ?        Show this help
+
+MODES:
+  :        Command mode
+  /        Search mode
+  Escape   Cancel/exit mode
+
+Press any key to return...";
+
+            Console.Clear();
+            Console.WriteLine(helpText);
+            TerminalConfirmation.WaitForAnyKey();
+
+            NavigationError?.Invoke(this, new NavigationErrorEventArgs("Help closed - returning to navigation"));
+        }
+        catch (Exception ex)
+        {
+            NavigationError?.Invoke(this, new NavigationErrorEventArgs($"Error displaying help: {ex.Message}"));
+            _logger.LogError(ex, "Error showing help");
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private static string GenerateUniqueFileName(string originalPath)
+    {
+        var directory = Path.GetDirectoryName(originalPath) ?? "";
+        var fileName = Path.GetFileNameWithoutExtension(originalPath);
+        var extension = Path.GetExtension(originalPath);
+
+        var counter = 1;
+        string newPath;
+
+        do
+        {
+            var newFileName = $"{fileName} ({counter}){extension}";
+            newPath = Path.Combine(directory, newFileName);
+            counter++;
+        }
+        while (File.Exists(newPath));
+
+        return newPath;
+    }
+
+    private static StorageItem CreateStorageItemFromNavigationItem(NavigationItem navigationItem, string containerName)
+    {
+        return navigationItem.Type switch
+        {
+            NavigationItemType.Container => Container.Create(
+                navigationItem.Name,
+                navigationItem.Path),
+            NavigationItemType.BlobFile => Blob.Create(
+                navigationItem.Name,
+                navigationItem.Path,
+                containerName,
+                BlobType.BlockBlob,
+                navigationItem.Size),
+            _ => Blob.Create(
+                navigationItem.Name,
+                navigationItem.Path,
+                containerName,
+                BlobType.BlockBlob,
+                navigationItem.Size)
+        };
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        string[] sizes = ["B", "KB", "MB", "GB", "TB"];
+        double len = bytes;
+        int order = 0;
+
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len /= 1024;
+        }
+
+        return $"{len:F1} {sizes[order]}";
     }
 
     private static string FormatSize(long bytes)

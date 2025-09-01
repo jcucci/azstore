@@ -13,7 +13,7 @@ public class KeySequenceBufferTests
         { KeyBindingAction.Enter, "l" },
         { KeyBindingAction.Top, "gg" },
         { KeyBindingAction.Bottom, "G" },
-        { KeyBindingAction.Download, "dd" },
+        { KeyBindingAction.Download, "d" },
         { KeyBindingAction.Command, ":" }
     };
 
@@ -98,7 +98,7 @@ public class KeySequenceBufferTests
     public void AddKey_InvalidSequenceFollowedByValidSingle_ReturnsMatch()
     {
         var buffer = new KeySequenceBuffer();
-        
+
         var bindings = new Dictionary<KeyBindingAction, string>(_testBindings)
         {
             { KeyBindingAction.Search, "x" }
@@ -149,7 +149,7 @@ public class KeySequenceBufferTests
     public void HasTimedOut_WithEmptySequence_ReturnsFalse()
     {
         var buffer = new KeySequenceBuffer();
-        
+
         Assert.False(buffer.HasTimedOut());
     }
 
@@ -209,7 +209,7 @@ public class KeySequenceBufferTests
         var firstResult = buffer.AddKey('g', conflictBindings);
         Assert.False(firstResult.isComplete);
         Assert.True(firstResult.hasPartialMatch);
-        
+
         // Wait for timeout
         Thread.Sleep(100);
 

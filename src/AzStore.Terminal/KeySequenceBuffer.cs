@@ -1,7 +1,7 @@
 namespace AzStore.Terminal;
 
 /// <summary>
-/// Buffers key sequences to support multi-character key bindings like 'gg', 'dd', etc.
+/// Buffers key sequences to support multi-character key bindings like 'gg', etc.
 /// </summary>
 public class KeySequenceBuffer
 {
