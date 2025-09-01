@@ -37,10 +37,7 @@ public class ListCommand : ICommand
 
         try
         {
-            var files = EnumerateFiles(sessionRoot, cancellationToken).ToList();
-            if (files.Count == 0)
-                return Task.FromResult(CommandResult.Ok("No files downloaded yet."));
-
+            var files = EnumerateFiles(sessionRoot, cancellationToken);
             var filtered = FilterByContainer(files, sessionRoot, options.Container);
             filtered = FilterByPattern(filtered, sessionRoot, options.Pattern);
 
@@ -83,20 +80,24 @@ public class ListCommand : ICommand
 
     private static IEnumerable<FileInfo> FilterByContainer(IEnumerable<FileInfo> files, string root, string? container)
     {
-        if (string.IsNullOrWhiteSpace(container)) return files;
-        var safeContainer = PathHelper.CreateSafeDirectoryName(container);
-        return files.Where(fi =>
+        bool FileMatchesFilter(FileInfo fi)
         {
             var rel = Path.GetRelativePath(root, fi.FullName);
             var firstSep = rel.IndexOf(Path.DirectorySeparatorChar);
             var firstSegment = firstSep >= 0 ? rel[..firstSep] : rel;
-            return string.Equals(firstSegment, safeContainer, StringComparison.OrdinalIgnoreCase);
-        });
+            return string.Equals(firstSegment, PathHelper.CreateSafeDirectoryName(container), StringComparison.OrdinalIgnoreCase);
+        }
+
+        return !string.IsNullOrWhiteSpace(container)
+            ? files.Where(FileMatchesFilter)
+            : files;
     }
 
     private static IEnumerable<FileInfo> FilterByPattern(IEnumerable<FileInfo> files, string root, string? pattern)
     {
-        if (string.IsNullOrWhiteSpace(pattern)) return files;
+        if (string.IsNullOrWhiteSpace(pattern))
+            return files;
+
         var regex = Glob.ToRegex(pattern);
         return files.Where(fi => regex.IsMatch(Path.GetRelativePath(root, fi.FullName)));
     }
