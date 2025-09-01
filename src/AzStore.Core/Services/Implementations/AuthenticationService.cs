@@ -45,10 +45,11 @@ public class AuthenticationService : IAuthenticationService
             var subscription = await armClient.GetDefaultSubscriptionAsync(cancellationToken);
             await subscription.GetAsync(cancellationToken);
 
+            var tenantIdText = subscription.Data.TenantId?.ToString();
             var result = AuthenticationResult.Successful(
                 accessToken: "*** (hidden for security)",
                 subscriptionId: subscription.Id.SubscriptionId != null ? Guid.Parse(subscription.Id.SubscriptionId) : null,
-                tenantId: subscription.Data.TenantId?.ToString() != null ? Guid.Parse(subscription.Data.TenantId.ToString()!) : null,
+                tenantId: tenantIdText != null ? Guid.Parse(tenantIdText) : null,
                 accountName: subscription.Data.DisplayName,
                 expiresOn: DateTime.UtcNow.AddHours(1)
             );
@@ -104,10 +105,11 @@ public class AuthenticationService : IAuthenticationService
             var subscription = armClient.GetSubscriptionResource(resourceIdentifier);
             await subscription.GetAsync(cancellationToken);
 
+            var tenantIdText = subscription.Data.TenantId?.ToString();
             var result = AuthenticationResult.Successful(
                 accessToken: "*** (hidden for security)",
                 subscriptionId: subscriptionId,
-                tenantId: subscription.Data.TenantId?.ToString() != null ? Guid.Parse(subscription.Data.TenantId.ToString()!) : null,
+                tenantId: tenantIdText != null ? Guid.Parse(tenantIdText) : null,
                 accountName: subscription.Data.DisplayName,
                 expiresOn: DateTime.UtcNow.AddHours(1)
             );
@@ -223,7 +225,8 @@ public class AuthenticationService : IAuthenticationService
             await foreach (var subscription in armClient.GetSubscriptions().GetAllAsync(cancellationToken))
             {
                 var subscriptionId = subscription.Id.SubscriptionId != null ? Guid.Parse(subscription.Id.SubscriptionId) : Guid.Empty;
-                var tenantId = subscription.Data.TenantId?.ToString() != null ? Guid.Parse(subscription.Data.TenantId.ToString()!) : Guid.Empty;
+                var tenantIdText = subscription.Data.TenantId?.ToString();
+                var tenantId = tenantIdText != null ? Guid.Parse(tenantIdText) : Guid.Empty;
 
                 if (subscriptionId != Guid.Empty)
                 {

@@ -299,11 +299,20 @@ public class NavigationEngine : INavigationEngine
 
             case NavigationLevel.Container:
             case NavigationLevel.BlobPrefix:
-                _currentBlobPage = await _storageService.ListBlobsAsync(
-                    _currentState.ContainerName!,
-                    _currentState.BlobPrefix,
-                    pageRequest,
-                    cancellationToken);
+                {
+                    var containerName = _currentState.ContainerName;
+                    if (string.IsNullOrEmpty(containerName))
+                    {
+                        // Inconsistent state: container level without a container name
+                        return;
+                    }
+
+                    _currentBlobPage = await _storageService.ListBlobsAsync(
+                        containerName,
+                        _currentState.BlobPrefix,
+                        pageRequest,
+                        cancellationToken);
+                }
                 _currentContainerPage = null;
 
                 foreach (var blob in _currentBlobPage.Items)
@@ -415,8 +424,15 @@ public class NavigationEngine : INavigationEngine
             _logger.LogInformation("Download requested for blob: {BlobName}", selectedItem.Name);
 
             // Get blob details for confirmation
+            var containerName = _currentState.ContainerName;
+            if (string.IsNullOrEmpty(containerName))
+            {
+                NavigationError?.Invoke(this, new NavigationErrorEventArgs("No container selected for download"));
+                return;
+            }
+
             var blob = await _storageService.GetBlobAsync(
-                _currentState.ContainerName!,
+                containerName,
                 selectedItem.Path ?? selectedItem.Name,
                 cancellationToken);
 
@@ -437,7 +453,7 @@ public class NavigationEngine : INavigationEngine
             // Calculate target path
             var targetPath = _pathService.CalculateBlobDownloadPath(
                 _currentSession,
-                _currentState.ContainerName!,
+                containerName,
                 selectedItem.Path ?? selectedItem.Name);
 
             // Check for conflicts
@@ -477,7 +493,7 @@ public class NavigationEngine : INavigationEngine
             // Perform download
             var downloadOptions = DownloadOptions.Default;
             var result = await _storageService.DownloadBlobWithProgressAsync(
-                _currentState.ContainerName!,
+                containerName,
                 selectedItem.Path ?? selectedItem.Name,
                 targetPath,
                 downloadOptions,
@@ -564,17 +580,21 @@ public class NavigationEngine : INavigationEngine
         {
             StorageItem? detailItem = selectedItem.Type switch
             {
-                NavigationItemType.BlobFile => await _storageService.GetBlobAsync(
-                    _currentState.ContainerName!,
-                    selectedItem.Path ?? selectedItem.Name,
-                    cancellationToken),
+                NavigationItemType.BlobFile =>
+                    string.IsNullOrEmpty(_currentState.ContainerName)
+                        ? null
+                        : await _storageService.GetBlobAsync(
+                            _currentState.ContainerName,
+                            selectedItem.Path ?? selectedItem.Name,
+                            cancellationToken),
                 NavigationItemType.Container => await _storageService.GetContainerPropertiesAsync(
                     selectedItem.Name,
                     cancellationToken),
                 _ => null
             };
 
-            var itemToShow = detailItem ?? CreateStorageItemFromNavigationItem(selectedItem, _currentState.ContainerName ?? "unknown");
+            var containerForFallback = string.IsNullOrEmpty(_currentState.ContainerName) ? "unknown" : _currentState.ContainerName;
+            var itemToShow = detailItem ?? CreateStorageItemFromNavigationItem(selectedItem, containerForFallback);
             var detailsText = TerminalProgressRenderer.RenderItemDetails(itemToShow);
 
             Console.Clear();

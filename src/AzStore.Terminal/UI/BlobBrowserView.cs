@@ -165,7 +165,10 @@ public class BlobBrowserView : View
 
         if (_currentState != null && _currentState.SelectedIndex < _displayItems.Count)
         {
-            _listView!.SelectedItem = _currentState.SelectedIndex;
+            if (_listView != null)
+            {
+                _listView.SelectedItem = _currentState.SelectedIndex;
+            }
         }
     }
 

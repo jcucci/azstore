@@ -18,9 +18,17 @@ public interface IConfigurationService
     /// </summary>
     /// <typeparam name="T">The type of the configuration value.</typeparam>
     /// <param name="key">The configuration key to retrieve.</param>
+    /// <returns>The configuration value, or null if not found.</returns>
+    T? GetValue<T>(string key);
+
+    /// <summary>
+    /// Gets a specific configuration value by key, or the provided default when missing.
+    /// </summary>
+    /// <typeparam name="T">The type of the configuration value.</typeparam>
+    /// <param name="key">The configuration key to retrieve.</param>
     /// <param name="defaultValue">The default value to return if the key is not found.</param>
     /// <returns>The configuration value, or the default value if not found.</returns>
-    T GetValue<T>(string key, T defaultValue = default!);
+    T GetValueOrDefault<T>(string key, T defaultValue);
 
     /// <summary>
     /// Gets a specific configuration section.

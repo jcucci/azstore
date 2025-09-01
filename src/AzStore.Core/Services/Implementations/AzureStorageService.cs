@@ -158,7 +158,7 @@ public class AzureStorageService : IStorageService
             _currentStorageAccountName, pageRequest.PageSize, !string.IsNullOrEmpty(pageRequest.ContinuationToken));
 
         var containers = new List<Container>();
-        var pages = _blobServiceClient!.GetBlobContainersAsync(cancellationToken: cancellationToken)
+        var pages = RequireClient().GetBlobContainersAsync(cancellationToken: cancellationToken)
             .AsPages(pageRequest.ContinuationToken, pageRequest.PageSize);
 
         await foreach (var page in pages)
@@ -241,7 +241,7 @@ public class AzureStorageService : IStorageService
 
         try
         {
-            var containerClient = _blobServiceClient!.GetBlobContainerClient(containerName);
+            var containerClient = GetContainerClient(containerName);
             var exists = await containerClient.ExistsAsync(cancellationToken);
 
             if (!exists.Value)
@@ -787,6 +787,22 @@ public class AzureStorageService : IStorageService
         }
     }
 
+    /// <summary>
+    /// Returns a connected BlobServiceClient instance or throws if not connected.
+    /// </summary>
+    private BlobServiceClient RequireClient()
+    {
+        lock (_lock)
+        {
+            if (!_isConnected || _blobServiceClient == null)
+            {
+                throw new InvalidOperationException("Not connected to a storage account. Call ConnectToStorageAccountAsync first.");
+            }
+
+            return _blobServiceClient;
+        }
+    }
+
 
     /// <summary>
     /// Converts Azure metadata dictionary to a standard dictionary, handling null values.
@@ -805,7 +821,7 @@ public class AzureStorageService : IStorageService
     private BlobContainerClient GetContainerClient(string containerName)
     {
         EnsureConnected();
-        return _blobServiceClient!.GetBlobContainerClient(containerName);
+        return RequireClient().GetBlobContainerClient(containerName);
     }
 
     /// <summary>
