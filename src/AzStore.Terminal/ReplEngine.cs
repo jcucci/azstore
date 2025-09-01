@@ -15,12 +15,12 @@ public class ReplEngine : IReplEngine
     private readonly ISessionManager _sessionManager;
     private readonly INavigationEngine _navigationEngine;
     private readonly KeySequenceBuffer _keySequenceBuffer;
-    
+
     private ReplMode _currentMode = ReplMode.Navigation;
     private string _commandBuffer = string.Empty;
     private bool _isInitialized = false;
 
-    public ReplEngine(IOptions<AzStoreSettings> settings, ILogger<ReplEngine> logger, ICommandRegistry commandRegistry, 
+    public ReplEngine(IOptions<AzStoreSettings> settings, ILogger<ReplEngine> logger, ICommandRegistry commandRegistry,
         ISessionManager sessionManager, INavigationEngine navigationEngine)
     {
         var settingsValue = settings.Value;
@@ -37,9 +37,9 @@ public class ReplEngine : IReplEngine
     {
         _logger.LogInformation("Starting REPL session");
         WriteStatus("AzStore CLI - Azure Blob Storage Terminal");
-        
+
         await InitializeSessionAsync(cancellationToken);
-        
+
         WriteStatus("Use VIM keys (j/k/l/h) to navigate, ':' for commands, or ':help' for help");
 
         while (!cancellationToken.IsCancellationRequested)
@@ -108,7 +108,7 @@ public class ReplEngine : IReplEngine
         {
             await _sessionManager.LoadSessionsAsync(cancellationToken);
             var activeSession = _sessionManager.GetActiveSession();
-            
+
             if (activeSession != null)
             {
                 await _navigationEngine.InitializeAsync(activeSession, cancellationToken);
@@ -192,7 +192,7 @@ public class ReplEngine : IReplEngine
                 _currentMode = ReplMode.Navigation;
                 _commandBuffer = string.Empty;
                 break;
-                
+
             case ConsoleKey.Enter:
                 if (!string.IsNullOrWhiteSpace(_commandBuffer))
                 {
@@ -203,7 +203,7 @@ public class ReplEngine : IReplEngine
                 _currentMode = ReplMode.Navigation;
                 _commandBuffer = string.Empty;
                 break;
-                
+
             case ConsoleKey.Backspace:
                 if (_commandBuffer.Length > 0)
                 {
@@ -214,7 +214,7 @@ public class ReplEngine : IReplEngine
                     _currentMode = ReplMode.Navigation;
                 }
                 break;
-                
+
             default:
                 if (!char.IsControl(keyInfo.KeyChar))
                 {
@@ -269,7 +269,7 @@ public class ReplEngine : IReplEngine
     private async Task RefreshNavigationIfNeededAsync(CancellationToken cancellationToken)
     {
         var activeSession = _sessionManager.GetActiveSession();
-        
+
         if (activeSession != null && !_isInitialized)
         {
             await _navigationEngine.InitializeAsync(activeSession, cancellationToken);

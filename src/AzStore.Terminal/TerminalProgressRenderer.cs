@@ -1,4 +1,5 @@
-using AzStore.Core.Models;
+using AzStore.Core.Models.Downloads;
+using AzStore.Core.Models.Storage;
 using System.Text;
 
 namespace AzStore.Terminal;
