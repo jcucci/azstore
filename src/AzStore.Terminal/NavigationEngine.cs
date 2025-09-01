@@ -1,5 +1,8 @@
-using AzStore.Core;
-using AzStore.Core.Models;
+using AzStore.Core.Models.Navigation;
+using AzStore.Core.Models.Paging;
+using AzStore.Core.Models.Session;
+using AzStore.Core.Models.Storage;
+using AzStore.Core.Services.Abstractions;
 using Microsoft.Extensions.Logging;
 
 namespace AzStore.Terminal;

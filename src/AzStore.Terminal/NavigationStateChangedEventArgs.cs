@@ -1,4 +1,4 @@
-using AzStore.Core.Models;
+using AzStore.Core.Models.Navigation;
 
 namespace AzStore.Terminal;
 

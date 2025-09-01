@@ -1,5 +1,5 @@
-using AzStore.Core;
-using AzStore.Core.Models;
+using AzStore.Core.Models.Authentication;
+using AzStore.Core.Services.Implementations;
 using Xunit;
 
 namespace AzStore.Core.Tests;

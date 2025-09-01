@@ -1,4 +1,5 @@
-using AzStore.Core.Models;
+using AzStore.Core.Models.Navigation;
+using AzStore.Core.Models.Storage;
 using Microsoft.Extensions.Logging;
 using Terminal.Gui;
 using System.Collections.ObjectModel;

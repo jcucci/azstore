@@ -1,5 +1,5 @@
 using AzStore.Configuration;
-using AzStore.Core.Models;
+using AzStore.Core.Models.Navigation;
 using System.Text;
 
 namespace AzStore.Terminal;

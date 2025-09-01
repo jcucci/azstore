@@ -1,5 +1,6 @@
-using AzStore.Core;
-using AzStore.Core.Models;
+using AzStore.Core.Models.Downloads;
+using AzStore.Core.Models.Session;
+using AzStore.Core.Services.Abstractions;
 using Microsoft.Extensions.Logging;
 
 namespace AzStore.Terminal.Commands;

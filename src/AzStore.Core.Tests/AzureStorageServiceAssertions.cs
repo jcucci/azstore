@@ -1,4 +1,4 @@
-using AzStore.Core;
+using AzStore.Core.Services.Implementations;
 using Xunit;
 
 namespace AzStore.Core.Tests;
