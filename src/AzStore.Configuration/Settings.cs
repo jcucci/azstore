@@ -28,6 +28,9 @@ public class AzStoreSettings
     [Required]
     public LoggingSettings Logging { get; set; } = new();
 
+    [Required]
+    public TerminalSelectionOptions Selection { get; set; } = new();
+
     private static string GetDefaultSessionsDirectory()
     {
         var documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);

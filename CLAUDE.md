@@ -45,6 +45,12 @@ The project uses a layered architecture with the following components:
 
 Hierarchical configuration: appsettings.json → TOML config (`%APPDATA%\azstore\azstore.toml` or `~/.config/azstore/azstore.toml`) → `AZSTORE_*` environment variables. Covers logging, themes, key bindings, file conflicts, and session management.
 
+- Terminal selection (multi-account picker):
+  - `AzStore:Selection:enableFuzzySearch` (bool, default true)
+  - `AzStore:Selection:maxVisibleItems` (int, default 15)
+  - `AzStore:Selection:highlightMatches` (bool, default true)
+  - `AzStore:Selection:pickerTimeoutMs` (int?, default null)
+
 ## Command System Architecture
 
 The application uses an extensible command pattern with dependency injection for maximum testability and maintainability.
@@ -54,6 +60,7 @@ The application uses an extensible command pattern with dependency injection for
 - **CommandRegistry**: Service that discovers and provides command lookup functionality
 - **CommandResult**: Standardized result type with success status, messages, and exit flags
 - **Built-in Commands**: ExitCommand, HelpCommand, ListCommand
+- **Interactive Selection**: `IAccountSelectionService` renders a non-destructive overlay picker for choosing items like storage accounts.
 
 ### Adding New Commands
 1. Create a class implementing `ICommand` interface
@@ -225,3 +232,8 @@ Complete development environment setup:
 - **Architecture**: Interface extraction, improved DI patterns, command registry with lazy loading
 - **Testing**: Migrated from FluentAssertions to standard xUnit assertions, 104+ tests with comprehensive edge case coverage
 - **Quality**: Modern C# 12 syntax, proper async/await patterns, cross-platform compatibility
+### Account Selection (Issue #55)
+- Non-destructive console overlay for multi-account scenarios using `IAccountSelectionService`.
+- Fuzzy search with lightweight subsequence/substring matcher (`SimpleFuzzyMatcher`).
+- VIM-like navigation supported: `j/k`, `gg/G`, arrows, PageUp/PageDown, Enter/Esc).
+- Selection is used when creating a session if multiple accounts are available.

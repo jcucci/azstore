@@ -17,6 +17,7 @@ public class SessionCommand : ICommand
     private readonly IAuthenticationService _authService;
     private readonly ILogger<SessionCommand> _logger;
     private readonly IOptions<AzStoreSettings> _settings;
+    private readonly AzStore.Terminal.Selection.IAccountSelectionService _accountPicker;
 
     /// <inheritdoc/>
     public string Name => "session";
@@ -34,12 +35,19 @@ public class SessionCommand : ICommand
     /// <param name="authService">The authentication service.</param>
     /// <param name="logger">Logger instance for this command.</param>
     /// <param name="settings">Configuration settings for the application.</param>
-    public SessionCommand(ISessionManager sessionManager, IAuthenticationService authService, ILogger<SessionCommand> logger, IOptions<AzStoreSettings> settings)
+    /// <param name="accountSelectionService">Service to interactively select a storage account when multiple are available.</param>
+    public SessionCommand(
+        ISessionManager sessionManager,
+        IAuthenticationService authService,
+        ILogger<SessionCommand> logger,
+        IOptions<AzStoreSettings> settings,
+        AzStore.Terminal.Selection.IAccountSelectionService accountSelectionService)
     {
         _sessionManager = sessionManager ?? throw new ArgumentNullException(nameof(sessionManager));
         _authService = authService ?? throw new ArgumentNullException(nameof(authService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+        _accountPicker = accountSelectionService ?? throw new ArgumentNullException(nameof(accountSelectionService));
     }
 
     /// <inheritdoc/>
@@ -101,8 +109,11 @@ public class SessionCommand : ICommand
                 }
                 else
                 {
-                    var accountList = string.Join(", ", accounts.Select(a => a.AccountName));
-                    return CommandResult.Error($"Multiple storage accounts available: {accountList}. Please specify one.");
+                    var selected = await _accountPicker.PickAsync(accounts, cancellationToken);
+                    if (selected == null)
+                        return CommandResult.Ok("Selection cancelled.");
+
+                    storageAccountName = selected.AccountName;
                 }
             }
 
