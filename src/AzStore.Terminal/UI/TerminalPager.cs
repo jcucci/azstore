@@ -108,7 +108,7 @@ public static class TerminalPager
                         lastSearch = ReadLineWithPrompt("/", width - 1);
                         if (!string.IsNullOrEmpty(lastSearch))
                         {
-                            lastMatchLine = FindMatch(lines, lastSearch!, startFrom: top + 1);
+                            lastMatchLine = FindMatch(lines, lastSearch, startFrom: top + 1);
                             if (lastMatchLine.HasValue)
                             {
                                 // Show match near top
@@ -119,7 +119,7 @@ public static class TerminalPager
                     }
                     if (key.KeyChar == 'n' && !string.IsNullOrEmpty(lastSearch))
                     {
-                        var next = FindMatch(lines, lastSearch!, startFrom: (lastMatchLine ?? top) + 1);
+                        var next = FindMatch(lines, lastSearch, startFrom: (lastMatchLine ?? top) + 1);
                         if (next.HasValue)
                         {
                             lastMatchLine = next;
@@ -198,7 +198,8 @@ public static class TerminalPager
     private static bool TryReadCharWithin(int milliseconds, out char ch)
     {
         var start = DateTime.UtcNow;
-        while ((DateTime.UtcNow - start).TotalMilliseconds < milliseconds)
+        var end = start.AddMilliseconds(milliseconds);
+        while (DateTime.UtcNow < end)
         {
             if (Console.KeyAvailable)
             {
@@ -206,7 +207,7 @@ public static class TerminalPager
                 ch = key.KeyChar;
                 return true;
             }
-            Thread.Sleep(10);
+            Thread.Sleep(1);
         }
         ch = '\0';
         return false;
@@ -236,4 +237,3 @@ public static class TerminalPager
         return value.Length <= width ? value : value[..Math.Max(0, width - 1)];
     }
 }
-
