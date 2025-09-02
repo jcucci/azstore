@@ -45,7 +45,7 @@ public class SessionManager : ISessionManager
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to ensure sessions root directory exists: {Root}", _sessionsRootDirectory);
+            _logger.LogWarning(ex, "Failed to ensure sessions root directory exists: {Root}. Session management may not function properly and sessions may not be created or loaded.", _sessionsRootDirectory);
         }
     }
 

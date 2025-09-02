@@ -14,19 +14,20 @@ public class DownloadCommand : ICommand
     private readonly IStorageService _storageService;
     private readonly IPathService _pathService;
     private readonly ISessionManager? _sessionManager;
-    private readonly IOptions<AzStoreSettings>? _settings;
+    private readonly IOptions<AzStoreSettings> _settings;
 
     public string Name => "download";
     public string[] Aliases => ["dl", "get"];
     public string Description => "Download blob(s) from Azure storage";
 
-    public DownloadCommand(ILogger<DownloadCommand> logger, IStorageService storageService, IPathService pathService, ISessionManager? sessionManager = null, IOptions<AzStoreSettings>? settings = null)
+    public DownloadCommand(ILogger<DownloadCommand> logger, IStorageService storageService, IPathService pathService, ISessionManager sessionManager, IOptions<AzStoreSettings> settings)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _storageService = storageService ?? throw new ArgumentNullException(nameof(storageService));
         _pathService = pathService ?? throw new ArgumentNullException(nameof(pathService));
+        ArgumentNullException.ThrowIfNull(sessionManager);
         _sessionManager = sessionManager;
-        _settings = settings;
+        _settings = settings ?? throw new ArgumentNullException(nameof(settings));
     }
 
     public async Task<CommandResult> ExecuteAsync(string[] args, CancellationToken cancellationToken = default)
@@ -147,20 +148,17 @@ public class DownloadCommand : ICommand
     {
         var options = DownloadOptions.Default;
 
-        var defaultConflict = _settings?.Value.OnFileConflict;
-        if (defaultConflict.HasValue)
+        // Apply default file conflict behavior from settings; CLI flags below can override
+        options = options with
         {
-            options = options with
+            ConflictResolution = _settings.Value.OnFileConflict switch
             {
-                ConflictResolution = defaultConflict.Value switch
-                {
-                    FileConflictBehavior.Overwrite => ConflictResolution.Overwrite,
-                    FileConflictBehavior.Skip => ConflictResolution.Skip,
-                    FileConflictBehavior.Rename => ConflictResolution.Rename,
-                    _ => options.ConflictResolution
-                }
-            };
-        }
+                FileConflictBehavior.Overwrite => ConflictResolution.Overwrite,
+                FileConflictBehavior.Skip => ConflictResolution.Skip,
+                FileConflictBehavior.Rename => ConflictResolution.Rename,
+                _ => options.ConflictResolution
+            }
+        };
 
         var argList = args.ToList();
         for (int i = 0; i < argList.Count; i++)
