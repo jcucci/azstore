@@ -22,6 +22,8 @@ public class NavigationEngine : INavigationEngine
     private readonly ILogger<NavigationEngine> _logger;
     private readonly VimNavigator _vimNavigator;
     private readonly IPathService _pathService;
+    private readonly HelpTextGenerator _helpTextGenerator;
+
     private Session? _currentSession;
     private NavigationState? _currentState;
     private readonly List<NavigationItem> _currentItems = [];
@@ -62,12 +64,14 @@ public class NavigationEngine : INavigationEngine
     /// <param name="logger">Logger instance for this service.</param>
     /// <param name="vimNavigator">The VIM navigator for modal state management.</param>
     /// <param name="pathService">The path service for calculating download paths.</param>
-    public NavigationEngine(IStorageService storageService, ILogger<NavigationEngine> logger, VimNavigator vimNavigator, IPathService pathService)
+    /// <param name="helpTextGenerator">Generates formatted help text for keybindings and commands.</param>
+    public NavigationEngine(IStorageService storageService, ILogger<NavigationEngine> logger, VimNavigator vimNavigator, IPathService pathService, HelpTextGenerator helpTextGenerator)
     {
         _storageService = storageService ?? throw new ArgumentNullException(nameof(storageService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _vimNavigator = vimNavigator ?? throw new ArgumentNullException(nameof(vimNavigator));
         _pathService = pathService ?? throw new ArgumentNullException(nameof(pathService));
+        _helpTextGenerator = helpTextGenerator ?? throw new ArgumentNullException(nameof(helpTextGenerator));
 
         // Wire up VIM navigator events
         _vimNavigator.ModeChanged += OnVimNavigatorModeChanged;
@@ -616,37 +620,19 @@ public class NavigationEngine : INavigationEngine
     {
         try
         {
-            // For now, we'll use a simple help display
-            // In the future, this could be integrated with HelpTextGenerator
-            var helpText = @"AzStore - Azure Blob Storage Terminal
-====================================
+            var title = "AzStore Help (press q/Esc to close)";
 
-NAVIGATION:
-  j/↓      Move down
-  k/↑      Move up  
-  l/Enter  Navigate into item
-  h        Navigate back
-  gg       Jump to top
-  G        Jump to bottom
+            var contextual = _currentState != null
+                ? _helpTextGenerator.GenerateContextualHelp(_currentState.GetLevel())
+                : string.Empty;
 
-ACTIONS:
-  d       Download selected blob
-  i        Show item details
-  r        Refresh current view
-  ?        Show this help
+            var full = _helpTextGenerator.GenerateFullHelp();
 
-MODES:
-  :        Command mode
-  /        Search mode
-  Escape   Cancel/exit mode
+            var combined = string.IsNullOrEmpty(contextual)
+                ? full
+                : contextual.TrimEnd() + Environment.NewLine + Environment.NewLine + full;
 
-Press any key to return...";
-
-            Console.Clear();
-            Console.WriteLine(helpText);
-            TerminalConfirmation.WaitForAnyKey();
-
-            NavigationError?.Invoke(this, new NavigationErrorEventArgs("Help closed - returning to navigation"));
+            TerminalPager.Show(title, combined);
         }
         catch (Exception ex)
         {
