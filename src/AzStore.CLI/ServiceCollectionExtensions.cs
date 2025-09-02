@@ -24,6 +24,13 @@ public static class ServiceCollectionExtensions
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
+        // Provide strongly-typed settings sub-objects for DI consumers
+        services.AddSingleton<KeyBindings>(provider =>
+        {
+            var settings = provider.GetRequiredService<IOptions<AzStoreSettings>>();
+            return settings.Value.KeyBindings;
+        });
+
         services.AddSingleton<IAuthenticationService, AuthenticationService>();
         services.AddSingleton<IPathService, PathService>();
         services.AddSingleton<IStorageService, AzureStorageService>();

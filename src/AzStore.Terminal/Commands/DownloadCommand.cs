@@ -3,6 +3,8 @@ using AzStore.Core.Models.Session;
 using AzStore.Core.Services.Abstractions;
 using AzStore.Terminal.Utilities;
 using Microsoft.Extensions.Logging;
+using AzStore.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace AzStore.Terminal.Commands;
 
@@ -12,17 +14,20 @@ public class DownloadCommand : ICommand
     private readonly IStorageService _storageService;
     private readonly IPathService _pathService;
     private readonly ISessionManager? _sessionManager;
+    private readonly IOptions<AzStoreSettings> _settings;
 
     public string Name => "download";
     public string[] Aliases => ["dl", "get"];
     public string Description => "Download blob(s) from Azure storage";
 
-    public DownloadCommand(ILogger<DownloadCommand> logger, IStorageService storageService, IPathService pathService, ISessionManager? sessionManager = null)
+    public DownloadCommand(ILogger<DownloadCommand> logger, IStorageService storageService, IPathService pathService, ISessionManager sessionManager, IOptions<AzStoreSettings> settings)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _storageService = storageService ?? throw new ArgumentNullException(nameof(storageService));
         _pathService = pathService ?? throw new ArgumentNullException(nameof(pathService));
+        ArgumentNullException.ThrowIfNull(sessionManager);
         _sessionManager = sessionManager;
+        _settings = settings ?? throw new ArgumentNullException(nameof(settings));
     }
 
     public async Task<CommandResult> ExecuteAsync(string[] args, CancellationToken cancellationToken = default)
@@ -139,11 +144,23 @@ public class DownloadCommand : ICommand
         }
     }
 
-    private static DownloadOptions ParseOptions(IEnumerable<string> args)
+    private DownloadOptions ParseOptions(IEnumerable<string> args)
     {
         var options = DownloadOptions.Default;
-        var argList = args.ToList();
 
+        // Apply default file conflict behavior from settings; CLI flags below can override
+        options = options with
+        {
+            ConflictResolution = _settings.Value.OnFileConflict switch
+            {
+                FileConflictBehavior.Overwrite => ConflictResolution.Overwrite,
+                FileConflictBehavior.Skip => ConflictResolution.Skip,
+                FileConflictBehavior.Rename => ConflictResolution.Rename,
+                _ => options.ConflictResolution
+            }
+        };
+
+        var argList = args.ToList();
         for (int i = 0; i < argList.Count; i++)
         {
             switch (argList[i].ToLowerInvariant())

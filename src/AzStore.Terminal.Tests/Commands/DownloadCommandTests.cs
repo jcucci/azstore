@@ -4,6 +4,7 @@ using AzStore.Core.Models.Downloads;
 using AzStore.Core.Services.Abstractions;
 using AzStore.Terminal.Commands;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 using Xunit;
 
@@ -16,6 +17,7 @@ public class DownloadCommandTests
     private readonly IStorageService _storageService;
     private readonly IPathService _pathService;
     private readonly ISessionManager _sessionManager;
+    private readonly IOptions<AzStore.Configuration.AzStoreSettings> _settings;
     private readonly DownloadCommand _command;
 
     public DownloadCommandTests()
@@ -24,7 +26,8 @@ public class DownloadCommandTests
         _storageService = Substitute.For<IStorageService>();
         _pathService = Substitute.For<IPathService>();
         _sessionManager = Substitute.For<ISessionManager>();
-        _command = new DownloadCommand(_logger, _storageService, _pathService, _sessionManager);
+        _settings = Options.Create(new AzStore.Configuration.AzStoreSettings());
+        _command = new DownloadCommand(_logger, _storageService, _pathService, _sessionManager, _settings);
     }
 
     [Fact]
