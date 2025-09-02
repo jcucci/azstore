@@ -79,6 +79,21 @@ public class MyCommand : ICommand
 }
 ```
 
+### Exit & Cleanup
+- Commands: `:exit`, `:q` for normal shutdown; `:exit!`, `:q!` for forced shutdown.
+- Force parsing: The REPL strips `!` and appends `--force` to args; commands check for `--force` to bypass prompts.
+- REPL exit: When a command returns `ShouldExit`, the REPL loop breaks and the hosted service triggers `StopApplication()`.
+- Downloads: `IDownloadActivity` tracks active downloads; normal exit prompts if any are active, force exit skips confirmation.
+- Sessions: `ExitCommand` attempts `ISessionManager.SaveSessionsAsync()` before exit (best effort).
+
+### REPL Parsing Pattern
+- Commands must start with `:`. The first token is the command name; remaining tokens are args.
+- A trailing `!` on the command token denotes force mode and results in `--force` being appended to args.
+
+### Download Activity
+- Use `IDownloadActivity.Begin()` to mark the lifetime of a download; dispose to decrement.
+- Check `HasActiveDownloads`/`ActiveCount` when deciding to prompt on exit or display status to the user.
+
 ## Development Practices
 
 ### Testing Strategy

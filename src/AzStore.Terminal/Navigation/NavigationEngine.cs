@@ -23,6 +23,7 @@ public class NavigationEngine : INavigationEngine
     private readonly VimNavigator _vimNavigator;
     private readonly IPathService _pathService;
     private readonly HelpTextGenerator _helpTextGenerator;
+    private readonly IDownloadActivity _downloadActivity;
 
     private Session? _currentSession;
     private NavigationState? _currentState;
@@ -65,6 +66,7 @@ public class NavigationEngine : INavigationEngine
     /// <param name="vimNavigator">The VIM navigator for modal state management.</param>
     /// <param name="pathService">The path service for calculating download paths.</param>
     /// <param name="helpTextGenerator">Generates formatted help text for keybindings and commands.</param>
+
     public NavigationEngine(IStorageService storageService, ILogger<NavigationEngine> logger, VimNavigator vimNavigator, IPathService pathService, HelpTextGenerator helpTextGenerator)
     {
         _storageService = storageService ?? throw new ArgumentNullException(nameof(storageService));
@@ -72,9 +74,17 @@ public class NavigationEngine : INavigationEngine
         _vimNavigator = vimNavigator ?? throw new ArgumentNullException(nameof(vimNavigator));
         _pathService = pathService ?? throw new ArgumentNullException(nameof(pathService));
         _helpTextGenerator = helpTextGenerator ?? throw new ArgumentNullException(nameof(helpTextGenerator));
+        _downloadActivity = new NullDownloadActivity();
 
         // Wire up VIM navigator events
         _vimNavigator.ModeChanged += OnVimNavigatorModeChanged;
+    }
+
+    // Overload to allow DI of download activity without breaking existing tests
+    public NavigationEngine(IStorageService storageService, ILogger<NavigationEngine> logger, VimNavigator vimNavigator, IPathService pathService, HelpTextGenerator helpTextGenerator, IDownloadActivity downloadActivity)
+        : this(storageService, logger, vimNavigator, pathService, helpTextGenerator)
+    {
+        _downloadActivity = downloadActivity ?? new NullDownloadActivity();
     }
 
     /// <inheritdoc/>
@@ -496,6 +506,7 @@ public class NavigationEngine : INavigationEngine
 
             // Perform download
             var downloadOptions = DownloadOptions.Default;
+            using var scope = _downloadActivity.Begin();
             var result = await _storageService.DownloadBlobWithProgressAsync(
                 containerName,
                 selectedItem.Path ?? selectedItem.Name,

@@ -15,12 +15,17 @@ public class DownloadCommand : ICommand
     private readonly IPathService _pathService;
     private readonly ISessionManager? _sessionManager;
     private readonly IOptions<AzStoreSettings> _settings;
+    private readonly IDownloadActivity _downloadActivity;
 
     public string Name => "download";
     public string[] Aliases => ["dl", "get"];
     public string Description => "Download blob(s) from Azure storage";
 
     public DownloadCommand(ILogger<DownloadCommand> logger, IStorageService storageService, IPathService pathService, ISessionManager sessionManager, IOptions<AzStoreSettings> settings)
+        : this(logger, storageService, pathService, sessionManager, settings, new NullDownloadActivity())
+    { }
+
+    public DownloadCommand(ILogger<DownloadCommand> logger, IStorageService storageService, IPathService pathService, ISessionManager sessionManager, IOptions<AzStoreSettings> settings, IDownloadActivity downloadActivity)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _storageService = storageService ?? throw new ArgumentNullException(nameof(storageService));
@@ -28,6 +33,7 @@ public class DownloadCommand : ICommand
         ArgumentNullException.ThrowIfNull(sessionManager);
         _sessionManager = sessionManager;
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+        _downloadActivity = downloadActivity ?? new NullDownloadActivity();
     }
 
     public async Task<CommandResult> ExecuteAsync(string[] args, CancellationToken cancellationToken = default)
@@ -81,6 +87,7 @@ public class DownloadCommand : ICommand
 
         var progress = new Progress<BlobDownloadProgress>(DisplayProgress);
 
+        using var scope = _downloadActivity.Begin();
         var result = await _storageService.DownloadBlobWithProgressAsync(
             containerName: containerName,
             blobName: blobName,
@@ -117,6 +124,7 @@ public class DownloadCommand : ICommand
 
         var overallProgress = new Progress<DownloadProgress>(DisplayOverallProgress);
 
+        using var scope = _downloadActivity.Begin();
         var results = await _storageService.DownloadBlobsAsync(
             containerName: containerName,
             blobPattern: blobPattern,

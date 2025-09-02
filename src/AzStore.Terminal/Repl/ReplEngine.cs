@@ -21,6 +21,7 @@ public class ReplEngine : IReplEngine
     private ReplMode _currentMode = ReplMode.Navigation;
     private string _commandBuffer = string.Empty;
     private bool _isInitialized = false;
+    private bool _shouldExit = false;
 
     public ReplEngine(IOptions<AzStoreSettings> settings, ILogger<ReplEngine> logger, ICommandRegistry commandRegistry, ISessionManager sessionManager, INavigationEngine navigationEngine)
     {
@@ -49,6 +50,9 @@ public class ReplEngine : IReplEngine
             {
                 RenderCurrentState();
                 await ProcessInteractionAsync(cancellationToken);
+
+                if (_shouldExit)
+                    break;
             }
             catch (OperationCanceledException)
             {
@@ -71,10 +75,21 @@ public class ReplEngine : IReplEngine
 
         if (input.StartsWith(':'))
         {
-            var command = _commandRegistry.FindCommand(input);
+            var trimmed = input.Trim();
+            var withoutColon = trimmed.TrimStart(':');
+            var firstSpace = withoutColon.IndexOf(' ');
+            var commandToken = firstSpace >= 0 ? withoutColon[..firstSpace] : withoutColon;
+            var isForce = commandToken.EndsWith('!');
+            var commandName = isForce ? commandToken[..^1] : commandToken;
+
+            var command = _commandRegistry.FindCommand(commandName);
             if (command != null)
             {
                 var args = ParseCommandArgs(input);
+
+                if (isForce)
+                    args = args.Length == 0 ? ["--force"] : [.. args, "--force"];
+
                 var result = await command.ExecuteAsync(args, cancellationToken);
 
                 if (!string.IsNullOrWhiteSpace(result.Message))
@@ -199,7 +214,10 @@ public class ReplEngine : IReplEngine
                 {
                     var shouldExit = await ProcessInputAsync($":{_commandBuffer}", cancellationToken);
                     if (shouldExit)
+                    {
+                        _shouldExit = true;
                         return;
+                    }
                 }
                 _currentMode = ReplMode.Navigation;
                 _commandBuffer = string.Empty;
