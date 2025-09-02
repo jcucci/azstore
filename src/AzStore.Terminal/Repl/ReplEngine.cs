@@ -1,5 +1,4 @@
 using AzStore.Configuration;
-using AzStore.Core;
 using AzStore.Core.Services.Abstractions;
 using AzStore.Terminal.Input;
 using AzStore.Terminal.Navigation;
@@ -23,8 +22,7 @@ public class ReplEngine : IReplEngine
     private string _commandBuffer = string.Empty;
     private bool _isInitialized = false;
 
-    public ReplEngine(IOptions<AzStoreSettings> settings, ILogger<ReplEngine> logger, ICommandRegistry commandRegistry,
-        ISessionManager sessionManager, INavigationEngine navigationEngine)
+    public ReplEngine(IOptions<AzStoreSettings> settings, ILogger<ReplEngine> logger, ICommandRegistry commandRegistry, ISessionManager sessionManager, INavigationEngine navigationEngine)
     {
         var settingsValue = settings.Value;
         _theme = settingsValue.Theme;
@@ -265,7 +263,8 @@ public class ReplEngine : IReplEngine
             { KeyBindingAction.Search, _keyBindings.Search },
             { KeyBindingAction.Top, _keyBindings.Top },
             { KeyBindingAction.Bottom, _keyBindings.Bottom },
-            { KeyBindingAction.Download, _keyBindings.Download }
+            { KeyBindingAction.Download, _keyBindings.Download },
+            { KeyBindingAction.Help, _keyBindings.Help }
         };
     }
 

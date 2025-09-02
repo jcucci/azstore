@@ -23,7 +23,7 @@ public class HelpCommand : ICommand
     public Task<CommandResult> ExecuteAsync(string[] args, CancellationToken cancellationToken = default)
     {
         _logger.LogDebug("User requested help");
-        
+
         var helpText = BuildHelpText();
         return Task.FromResult(CommandResult.Ok(helpText));
     }
@@ -32,11 +32,15 @@ public class HelpCommand : ICommand
     {
         var commands = _commandRegistry.GetAllCommands();
         var helpLines = commands.Select(FormatCommandHelp);
-        
+
         var commandsSection = "Available commands:\n" + string.Join("\n", helpLines);
         var navigationSection = BuildNavigationHelp();
-        
-        return commandsSection + "\n\n" + navigationSection;
+
+        var generator = new Utilities.HelpTextGenerator(_keyBindings);
+        var quickRef = generator.GenerateQuickReference();
+        var tip = "Tip: Press '?' for interactive help with scrolling and search.";
+
+        return string.Join("\n\n", new[] { commandsSection, navigationSection, "Quick Reference:", quickRef, tip });
     }
 
     private string BuildNavigationHelp()
@@ -58,13 +62,13 @@ public class HelpCommand : ICommand
     private static string FormatCommandHelp(ICommand command)
     {
         var commandNames = $":{command.Name}";
-        
+
         if (command.Aliases.Length > 0)
         {
             var aliases = string.Join(", :", command.Aliases);
             commandNames += $", :{aliases}";
         }
-        
+
         return $"  {commandNames} - {command.Description}";
     }
 }
