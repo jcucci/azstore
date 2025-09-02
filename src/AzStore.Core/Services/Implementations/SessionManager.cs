@@ -2,6 +2,8 @@ using System.Text.Json;
 using AzStore.Core.Models.Session;
 using AzStore.Core.Services.Abstractions;
 using Microsoft.Extensions.Logging;
+using AzStore.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace AzStore.Core.Services.Implementations;
 
@@ -18,26 +20,39 @@ public class SessionManager : ISessionManager
 
     private Session? _activeSession;
     private readonly string _sessionFilePath;
+    private readonly string _sessionsRootDirectory;
 
     /// <summary>
     /// Initializes a new instance of the SessionManager class.
     /// </summary>
     /// <param name="logger">Logger instance for this service.</param>
-    public SessionManager(ILogger<SessionManager> logger)
+    /// <param name="settings">Configuration settings for the application.</param>
+    public SessionManager(ILogger<SessionManager> logger, IOptions<AzStoreSettings> settings)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        ArgumentNullException.ThrowIfNull(settings);
 
         var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
         var configPath = Path.Combine(appDataPath, "azstore");
         Directory.CreateDirectory(configPath);
         _sessionFilePath = Path.Combine(configPath, "sessions.json");
+
+        _sessionsRootDirectory = settings.Value.SessionsDirectory;
+        try
+        {
+            if (!Directory.Exists(_sessionsRootDirectory))
+                Directory.CreateDirectory(_sessionsRootDirectory);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to ensure sessions root directory exists: {Root}", _sessionsRootDirectory);
+        }
     }
 
     /// <inheritdoc/>
-    public async Task<Session> CreateSessionAsync(string name, string directory, string storageAccountName, Guid subscriptionId, CancellationToken cancellationToken = default)
+    public async Task<Session> CreateSessionAsync(string name, string storageAccountName, Guid subscriptionId, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentException.ThrowIfNullOrWhiteSpace(directory);
         ArgumentException.ThrowIfNullOrWhiteSpace(storageAccountName);
 
         if (name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
@@ -51,7 +66,8 @@ public class SessionManager : ISessionManager
         if (_sessions.ContainsKey(name))
             throw new InvalidOperationException($"Session '{name}' already exists");
 
-        var fullPath = Path.GetFullPath(directory);
+        var fullPath = Path.Combine(_sessionsRootDirectory, name);
+        fullPath = Path.GetFullPath(fullPath);
         if (!Directory.Exists(fullPath))
         {
             try

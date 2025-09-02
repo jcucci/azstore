@@ -1,7 +1,9 @@
 using AzStore.Core.Models.Authentication;
 using AzStore.Core.Models.Session;
 using AzStore.Core.Services.Abstractions;
+using AzStore.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace AzStore.Terminal.Commands;
 
@@ -14,6 +16,7 @@ public class SessionCommand : ICommand
     private readonly ISessionManager _sessionManager;
     private readonly IAuthenticationService _authService;
     private readonly ILogger<SessionCommand> _logger;
+    private readonly IOptions<AzStoreSettings> _settings;
 
     /// <inheritdoc/>
     public string Name => "session";
@@ -30,11 +33,13 @@ public class SessionCommand : ICommand
     /// <param name="sessionManager">The session manager service.</param>
     /// <param name="authService">The authentication service.</param>
     /// <param name="logger">Logger instance for this command.</param>
-    public SessionCommand(ISessionManager sessionManager, IAuthenticationService authService, ILogger<SessionCommand> logger)
+    /// <param name="settings">Configuration settings for the application.</param>
+    public SessionCommand(ISessionManager sessionManager, IAuthenticationService authService, ILogger<SessionCommand> logger, IOptions<AzStoreSettings> settings)
     {
         _sessionManager = sessionManager ?? throw new ArgumentNullException(nameof(sessionManager));
         _authService = authService ?? throw new ArgumentNullException(nameof(authService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _settings = settings ?? throw new ArgumentNullException(nameof(settings));
     }
 
     /// <inheritdoc/>
@@ -64,14 +69,13 @@ public class SessionCommand : ICommand
 
     private async Task<CommandResult> CreateSessionAsync(string[] args, CancellationToken cancellationToken)
     {
-        if (args.Length < 2)
+        if (args.Length < 1)
         {
-            return CommandResult.Error("Usage: :session create <name> <directory> [storage-account]");
+            return CommandResult.Error("Usage: :session create <name> [storage-account]");
         }
 
         var sessionName = args[0];
-        var directory = args[1];
-        string? storageAccountName = args.Length > 2 ? args[2] : null;
+        string? storageAccountName = args.Length > 1 ? args[1] : null;
 
         try
         {
@@ -104,7 +108,6 @@ public class SessionCommand : ICommand
 
             var session = await _sessionManager.CreateSessionAsync(
                 sessionName,
-                directory,
                 storageAccountName,
                 authResult.SubscriptionId.Value,
                 cancellationToken);
@@ -325,8 +328,9 @@ public class SessionCommand : ICommand
         var usage = """
 Session Management Commands:
 
-:session create <name> <directory> [storage-account]
-    Create a new session for the specified storage account
+:session create <name> [storage-account]
+    Create a new session for the specified storage account.
+    Session data directory is {AzStore:SessionsDirectory}/{name}
 
 :session list
     List all available sessions
@@ -355,7 +359,7 @@ Session Management Commands:
     Show this help message
 
 Examples:
-  :session create myapp /home/user/downloads myappstore
+  :session create myapp myappstore
   :session switch myapp
   :session list
   :session cleanup 30

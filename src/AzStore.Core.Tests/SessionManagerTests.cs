@@ -1,6 +1,8 @@
 using AzStore.Core.Models.Session;
 using AzStore.Core.Services.Implementations;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using AzStore.Configuration;
 using NSubstitute;
 using Xunit;
 
@@ -23,7 +25,8 @@ public class SessionManagerTests : IDisposable
         Environment.SetEnvironmentVariable("APPDATA", _tempDirectory);
         Environment.SetEnvironmentVariable("HOME", _tempDirectory);
 
-        _sessionManager = new SessionManager(_logger);
+        var options = Options.Create(new AzStoreSettings { SessionsDirectory = _tempDirectory });
+        _sessionManager = new SessionManager(_logger, options);
     }
 
     [Fact]
@@ -31,16 +34,15 @@ public class SessionManagerTests : IDisposable
     {
         // Arrange
         var name = "test-session";
-        var directory = Path.Combine(_tempDirectory, "session-dir");
         var storageAccount = "mystorageaccount";
         var subscriptionId = Guid.NewGuid();
 
         // Act
-        var result = await _sessionManager.CreateSessionAsync(name, directory, storageAccount, subscriptionId);
+        var result = await _sessionManager.CreateSessionAsync(name, storageAccount, subscriptionId);
 
         // Assert
         Assert.Equal(name, result.Name);
-        Assert.Equal(Path.GetFullPath(directory), result.Directory);
+        Assert.Equal(Path.GetFullPath(Path.Combine(_tempDirectory, name)), result.Directory);
         Assert.Equal(storageAccount, result.StorageAccountName);
         Assert.Equal(subscriptionId, result.SubscriptionId);
         Assert.True(Directory.Exists(result.Directory));
@@ -49,16 +51,16 @@ public class SessionManagerTests : IDisposable
     }
 
     [Theory]
-    [InlineData("", "dir", "account")]
-    [InlineData(" ", "dir", "account")]
-    public async Task CreateSessionAsync_WithInvalidName_ThrowsArgumentException(string? name, string directory, string storageAccount)
+    [InlineData("", "account")]
+    [InlineData(" ", "account")]
+    public async Task CreateSessionAsync_WithInvalidName_ThrowsArgumentException(string? name, string storageAccount)
     {
         // Arrange
         var subscriptionId = Guid.NewGuid();
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(() =>
-            _sessionManager.CreateSessionAsync(name!, directory, storageAccount, subscriptionId));
+            _sessionManager.CreateSessionAsync(name!, storageAccount, subscriptionId));
     }
 
     [Fact]
@@ -69,44 +71,37 @@ public class SessionManagerTests : IDisposable
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentNullException>(() =>
-            _sessionManager.CreateSessionAsync(null!, "dir", "account", subscriptionId));
-    }
-
-    [Theory]
-    [InlineData("name", "", "account")]
-    [InlineData("name", " ", "account")]
-    public async Task CreateSessionAsync_WithInvalidDirectory_ThrowsArgumentException(string name, string? directory, string storageAccount)
-    {
-        // Arrange
-        var subscriptionId = Guid.NewGuid();
-
-        // Act & Assert
-        await Assert.ThrowsAsync<ArgumentException>(() =>
-            _sessionManager.CreateSessionAsync(name, directory!, storageAccount, subscriptionId));
+            _sessionManager.CreateSessionAsync(null!, "account", subscriptionId));
     }
 
     [Fact]
-    public async Task CreateSessionAsync_WithNullDirectory_ThrowsArgumentNullException()
+    public async Task CreateSessionAsync_UsesConfiguredRoot()
     {
         // Arrange
+        var name = "dir-override";
+        var storageAccount = "mystorageaccount";
         var subscriptionId = Guid.NewGuid();
 
-        // Act & Assert
-        await Assert.ThrowsAsync<ArgumentNullException>(() =>
-            _sessionManager.CreateSessionAsync("name", null!, "account", subscriptionId));
+        // Act
+        var result = await _sessionManager.CreateSessionAsync(name, storageAccount, subscriptionId);
+
+        // Assert
+        var expected = Path.Combine(_tempDirectory, name);
+        Assert.Equal(Path.GetFullPath(expected), result.Directory);
+        Assert.True(Directory.Exists(result.Directory));
     }
 
     [Theory]
-    [InlineData("name", "dir", "")]
-    [InlineData("name", "dir", " ")]
-    public async Task CreateSessionAsync_WithInvalidStorageAccount_ThrowsArgumentException(string name, string directory, string? storageAccount)
+    [InlineData("name", "")]
+    [InlineData("name", " ")]
+    public async Task CreateSessionAsync_WithInvalidStorageAccount_ThrowsArgumentException(string name, string? storageAccount)
     {
         // Arrange
         var subscriptionId = Guid.NewGuid();
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(() =>
-            _sessionManager.CreateSessionAsync(name, directory, storageAccount!, subscriptionId));
+            _sessionManager.CreateSessionAsync(name, storageAccount!, subscriptionId));
     }
 
     [Fact]
@@ -117,7 +112,7 @@ public class SessionManagerTests : IDisposable
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentNullException>(() =>
-            _sessionManager.CreateSessionAsync("name", "dir", null!, subscriptionId));
+            _sessionManager.CreateSessionAsync("name", null!, subscriptionId));
     }
 
     [Fact]
@@ -125,16 +120,14 @@ public class SessionManagerTests : IDisposable
     {
         // Arrange
         var name = "duplicate-session";
-        var directory1 = Path.Combine(_tempDirectory, "dir1");
-        var directory2 = Path.Combine(_tempDirectory, "dir2");
         var storageAccount = "mystorageaccount";
         var subscriptionId = Guid.NewGuid();
 
-        await _sessionManager.CreateSessionAsync(name, directory1, storageAccount, subscriptionId);
+        await _sessionManager.CreateSessionAsync(name, storageAccount, subscriptionId);
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _sessionManager.CreateSessionAsync(name, directory2, storageAccount, subscriptionId));
+            _sessionManager.CreateSessionAsync(name, storageAccount, subscriptionId));
 
         Assert.Contains("already exists", exception.Message);
     }
@@ -144,11 +137,10 @@ public class SessionManagerTests : IDisposable
     {
         // Arrange
         var name = "test-session";
-        var directory = Path.Combine(_tempDirectory, "session-dir");
         var storageAccount = "mystorageaccount";
         var subscriptionId = Guid.NewGuid();
 
-        var session = await _sessionManager.CreateSessionAsync(name, directory, storageAccount, subscriptionId);
+        var session = await _sessionManager.CreateSessionAsync(name, storageAccount, subscriptionId);
 
         // Act
         var result = _sessionManager.GetSession(name);
@@ -199,8 +191,8 @@ public class SessionManagerTests : IDisposable
     public async Task GetAllSessions_WithMultipleSessions_ReturnsAllSessions()
     {
         // Arrange
-        var session1 = await _sessionManager.CreateSessionAsync("session1", Path.Combine(_tempDirectory, "dir1"), "account1", Guid.NewGuid());
-        var session2 = await _sessionManager.CreateSessionAsync("session2", Path.Combine(_tempDirectory, "dir2"), "account2", Guid.NewGuid());
+        var session1 = await _sessionManager.CreateSessionAsync("session1", "account1", Guid.NewGuid());
+        var session2 = await _sessionManager.CreateSessionAsync("session2", "account2", Guid.NewGuid());
 
         // Act
         var result = _sessionManager.GetAllSessions().ToList();
@@ -216,11 +208,10 @@ public class SessionManagerTests : IDisposable
     {
         // Arrange
         var name = "test-session";
-        var directory = Path.Combine(_tempDirectory, "session-dir");
         var storageAccount = "mystorageaccount";
         var subscriptionId = Guid.NewGuid();
 
-        var originalSession = await _sessionManager.CreateSessionAsync(name, directory, storageAccount, subscriptionId);
+        var originalSession = await _sessionManager.CreateSessionAsync(name, storageAccount, subscriptionId);
         var modifiedSession = originalSession with { StorageAccountName = "newstorageaccount" };
 
         // Act
@@ -260,11 +251,10 @@ public class SessionManagerTests : IDisposable
     {
         // Arrange
         var name = "test-session";
-        var directory = Path.Combine(_tempDirectory, "session-dir");
         var storageAccount = "mystorageaccount";
         var subscriptionId = Guid.NewGuid();
 
-        await _sessionManager.CreateSessionAsync(name, directory, storageAccount, subscriptionId);
+        await _sessionManager.CreateSessionAsync(name, storageAccount, subscriptionId);
 
         // Act
         var result = await _sessionManager.DeleteSessionAsync(name);
@@ -289,11 +279,10 @@ public class SessionManagerTests : IDisposable
     {
         // Arrange
         var name = "active-session";
-        var directory = Path.Combine(_tempDirectory, "session-dir");
         var storageAccount = "mystorageaccount";
         var subscriptionId = Guid.NewGuid();
 
-        var session = await _sessionManager.CreateSessionAsync(name, directory, storageAccount, subscriptionId);
+        var session = await _sessionManager.CreateSessionAsync(name, storageAccount, subscriptionId);
         _sessionManager.SetActiveSession(session);
 
         // Act
@@ -327,11 +316,10 @@ public class SessionManagerTests : IDisposable
     {
         // Arrange
         var name = "test-session";
-        var directory = Path.Combine(_tempDirectory, "session-dir");
         var storageAccount = "mystorageaccount";
         var subscriptionId = Guid.NewGuid();
 
-        var session = await _sessionManager.CreateSessionAsync(name, directory, storageAccount, subscriptionId);
+        var session = await _sessionManager.CreateSessionAsync(name, storageAccount, subscriptionId);
 
         // Act
         _sessionManager.SetActiveSession(session);
@@ -365,11 +353,10 @@ public class SessionManagerTests : IDisposable
     {
         // Arrange
         var name = "test-session";
-        var directory = Path.Combine(_tempDirectory, "session-dir");
         var storageAccount = "mystorageaccount";
         var subscriptionId = Guid.NewGuid();
 
-        var session = await _sessionManager.CreateSessionAsync(name, directory, storageAccount, subscriptionId);
+        var session = await _sessionManager.CreateSessionAsync(name, storageAccount, subscriptionId);
         _sessionManager.SetActiveSession(session);
 
         // Act
@@ -384,11 +371,10 @@ public class SessionManagerTests : IDisposable
     {
         // Arrange
         var name = "test-session";
-        var directory = Path.Combine(_tempDirectory, "session-dir");
         var storageAccount = "mystorageaccount";
         var subscriptionId = Guid.NewGuid();
 
-        var originalSession = await _sessionManager.CreateSessionAsync(name, directory, storageAccount, subscriptionId);
+        var originalSession = await _sessionManager.CreateSessionAsync(name, storageAccount, subscriptionId);
         await Task.Delay(10); // Ensure time difference
 
         // Act
@@ -432,11 +418,10 @@ public class SessionManagerTests : IDisposable
     {
         // Arrange
         var name = "test-session";
-        var directory = Path.Combine(_tempDirectory, "session-dir");
         var storageAccount = "mystorageaccount";
         var subscriptionId = Guid.NewGuid();
 
-        var session = await _sessionManager.CreateSessionAsync(name, directory, storageAccount, subscriptionId);
+        var session = await _sessionManager.CreateSessionAsync(name, storageAccount, subscriptionId);
 
         // Act
         var result = _sessionManager.ValidateSessionDirectory(session);
@@ -487,11 +472,12 @@ public class SessionManagerTests : IDisposable
     public async Task SaveAndLoadSessionsAsync_PersistsSessionsCorrectly()
     {
         // Arrange
-        var session1 = await _sessionManager.CreateSessionAsync("session1", Path.Combine(_tempDirectory, "dir1"), "account1", Guid.NewGuid());
-        var session2 = await _sessionManager.CreateSessionAsync("session2", Path.Combine(_tempDirectory, "dir2"), "account2", Guid.NewGuid());
+        var session1 = await _sessionManager.CreateSessionAsync("session1", "account1", Guid.NewGuid());
+        var session2 = await _sessionManager.CreateSessionAsync("session2", "account2", Guid.NewGuid());
 
         // Create a new SessionManager instance to test loading
-        var newSessionManager = new SessionManager(_logger);
+        var options = Options.Create(new AzStoreSettings { SessionsDirectory = _tempDirectory });
+        var newSessionManager = new SessionManager(_logger, options);
 
         // Act
         await newSessionManager.LoadSessionsAsync();
@@ -519,7 +505,8 @@ public class SessionManagerTests : IDisposable
         Environment.SetEnvironmentVariable("APPDATA", newTempDir);
         Environment.SetEnvironmentVariable("HOME", newTempDir);
 
-        var newSessionManager = new SessionManager(_logger);
+        var options = Options.Create(new AzStoreSettings { SessionsDirectory = newTempDir });
+        var newSessionManager = new SessionManager(_logger, options);
 
         // Act & Assert
         await newSessionManager.LoadSessionsAsync(); // Should not throw

@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AzStore.Core\AzStore.Core.csproj" />
+    <ProjectReference Include="..\AzStore.Configuration\AzStore.Configuration.csproj" />
   </ItemGroup>
 
 </Project>
