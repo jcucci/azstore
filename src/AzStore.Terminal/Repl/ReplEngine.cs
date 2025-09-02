@@ -75,19 +75,12 @@ public class ReplEngine : IReplEngine
 
         if (input.StartsWith(':'))
         {
-            var trimmed = input.Trim();
-            var withoutColon = trimmed.TrimStart(':');
-            var firstSpace = withoutColon.IndexOf(' ');
-            var commandToken = firstSpace >= 0 ? withoutColon[..firstSpace] : withoutColon;
-            var isForce = commandToken.EndsWith('!');
-            var commandName = isForce ? commandToken[..^1] : commandToken;
-
-            var command = _commandRegistry.FindCommand(commandName);
+            var parsed = CommandParser.Parse(input);
+            var command = _commandRegistry.FindCommand(parsed.CommandName);
             if (command != null)
             {
-                var args = ParseCommandArgs(input);
-
-                if (isForce)
+                var args = parsed.Arguments;
+                if (parsed.IsForce)
                     args = args.Length == 0 ? ["--force"] : [.. args, "--force"];
 
                 var result = await command.ExecuteAsync(args, cancellationToken);
@@ -303,8 +296,8 @@ public class ReplEngine : IReplEngine
 
     private static string[] ParseCommandArgs(string input)
     {
-        var parts = input.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        return parts.Length > 1 ? parts[1..] : [];
+        var parsed = CommandParser.Parse(input);
+        return parsed.Arguments;
     }
 
     public void WritePrompt(string message)

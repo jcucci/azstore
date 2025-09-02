@@ -66,25 +66,24 @@ public class NavigationEngine : INavigationEngine
     /// <param name="vimNavigator">The VIM navigator for modal state management.</param>
     /// <param name="pathService">The path service for calculating download paths.</param>
     /// <param name="helpTextGenerator">Generates formatted help text for keybindings and commands.</param>
-
-    public NavigationEngine(IStorageService storageService, ILogger<NavigationEngine> logger, VimNavigator vimNavigator, IPathService pathService, HelpTextGenerator helpTextGenerator)
+    /// <param name="downloadActivity">Tracks active downloads for exit prompts.</param>
+    public NavigationEngine(
+        IStorageService storageService,
+        ILogger<NavigationEngine> logger,
+        VimNavigator vimNavigator,
+        IPathService pathService,
+        HelpTextGenerator helpTextGenerator,
+        IDownloadActivity downloadActivity)
     {
         _storageService = storageService ?? throw new ArgumentNullException(nameof(storageService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _vimNavigator = vimNavigator ?? throw new ArgumentNullException(nameof(vimNavigator));
         _pathService = pathService ?? throw new ArgumentNullException(nameof(pathService));
         _helpTextGenerator = helpTextGenerator ?? throw new ArgumentNullException(nameof(helpTextGenerator));
-        _downloadActivity = new NullDownloadActivity();
+        _downloadActivity = downloadActivity ?? throw new ArgumentNullException(nameof(downloadActivity));
 
         // Wire up VIM navigator events
         _vimNavigator.ModeChanged += OnVimNavigatorModeChanged;
-    }
-
-    // Overload to allow DI of download activity without breaking existing tests
-    public NavigationEngine(IStorageService storageService, ILogger<NavigationEngine> logger, VimNavigator vimNavigator, IPathService pathService, HelpTextGenerator helpTextGenerator, IDownloadActivity downloadActivity)
-        : this(storageService, logger, vimNavigator, pathService, helpTextGenerator)
-    {
-        _downloadActivity = downloadActivity ?? new NullDownloadActivity();
     }
 
     /// <inheritdoc/>
