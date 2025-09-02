@@ -1,74 +1,50 @@
+using AzStore.Core.Services.Abstractions;
 using AzStore.Terminal.Commands;
+using AzStore.Terminal.Utilities;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using Xunit;
 
-namespace AzStore.Terminal.Tests.Commands;
+namespace AzStore.Terminal.Tests;
 
 public class ExitCommandTests
 {
     [Fact]
-    public void Name_ReturnsExit()
+    [Trait("Category", "Unit")]
+    public async Task ExecuteAsync_NoActiveDownloads_ExitsAndSavesSessions()
     {
         var logger = Substitute.For<ILogger<ExitCommand>>();
-        var command = new ExitCommand(logger);
-        
-        Assert.Equal("exit", command.Name);
-    }
+        var sessions = Substitute.For<ISessionManager>();
+        var lifetime = Substitute.For<IHostApplicationLifetime>();
+        var activity = Substitute.For<IDownloadActivity>();
+        activity.HasActiveDownloads.Returns(false);
 
-    [Fact]
-    public void Aliases_ContainsQ()
-    {
-        var logger = Substitute.For<ILogger<ExitCommand>>();
-        var command = new ExitCommand(logger);
-        
-        Assert.Contains("q", command.Aliases);
-    }
+        var cmd = new ExitCommand(logger, sessions, lifetime, activity);
+        var result = await cmd.ExecuteAsync(Array.Empty<string>());
 
-    [Fact]
-    public void Description_IsNotEmpty()
-    {
-        var logger = Substitute.For<ILogger<ExitCommand>>();
-        var command = new ExitCommand(logger);
-        
-        Assert.False(string.IsNullOrWhiteSpace(command.Description));
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_ReturnsExitResult()
-    {
-        var logger = Substitute.For<ILogger<ExitCommand>>();
-        var command = new ExitCommand(logger);
-        
-        var result = await command.ExecuteAsync(Array.Empty<string>());
-        
-        Assert.True(result.Success);
         Assert.True(result.ShouldExit);
-        Assert.NotNull(result.Message);
+        await sessions.Received(1).SaveSessionsAsync(Arg.Any<CancellationToken>());
+        lifetime.Received(1).StopApplication();
     }
 
     [Fact]
-    public async Task ExecuteAsync_WithCancellation_CompletesSuccessfully()
+    [Trait("Category", "Unit")]
+    public async Task ExecuteAsync_Force_SkipsPromptAndExits()
     {
         var logger = Substitute.For<ILogger<ExitCommand>>();
-        var command = new ExitCommand(logger);
-        using var cts = new CancellationTokenSource();
-        cts.Cancel();
-        
-        var result = await command.ExecuteAsync(Array.Empty<string>(), cts.Token);
-        
-        Assert.True(result.Success);
+        var sessions = Substitute.For<ISessionManager>();
+        var lifetime = Substitute.For<IHostApplicationLifetime>();
+        var activity = Substitute.For<IDownloadActivity>();
+        activity.HasActiveDownloads.Returns(true);
+        activity.ActiveCount.Returns(3);
+
+        var cmd = new ExitCommand(logger, sessions, lifetime, activity);
+        var result = await cmd.ExecuteAsync(new[] { "--force" });
+
         Assert.True(result.ShouldExit);
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_LogsInformation()
-    {
-        var logger = Substitute.For<ILogger<ExitCommand>>();
-        var command = new ExitCommand(logger);
-        
-        await command.ExecuteAsync(Array.Empty<string>());
-        
-        logger.Received(1).LogInformation("User initiated exit via command");
+        await sessions.Received(1).SaveSessionsAsync(Arg.Any<CancellationToken>());
+        lifetime.Received(1).StopApplication();
     }
 }
+

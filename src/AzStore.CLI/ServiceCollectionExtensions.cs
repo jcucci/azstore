@@ -42,6 +42,7 @@ public static class ServiceCollectionExtensions
             var settings = provider.GetRequiredService<IOptions<AzStoreSettings>>();
             return new HelpTextGenerator(settings.Value.KeyBindings);
         });
+        services.AddSingleton<IDownloadActivity, DownloadActivity>();
         services.AddSingleton<IReplEngine, ReplEngine>();
         services.AddSingleton<IInputHandler>(provider =>
         {
