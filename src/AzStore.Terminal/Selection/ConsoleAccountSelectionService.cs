@@ -44,12 +44,13 @@ public class ConsoleAccountSelectionService : IAccountSelectionService
         var engine = new AccountPickerEngine(accounts, _matcher, _options);
         var maxVisible = engine.MaxVisible;
 
-        var startTime = _options.PickerTimeoutMs.HasValue ? DateTime.UtcNow : (DateTime?)null;
+        // Treat picker timeout as an inactivity timeout; reset on keypress
+        var lastInputTime = _options.PickerTimeoutMs.HasValue ? DateTime.UtcNow : (DateTime?)null;
 
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (_options.PickerTimeoutMs.HasValue && startTime.HasValue && (DateTime.UtcNow - startTime.Value).TotalMilliseconds > _options.PickerTimeoutMs.Value)
+            if (_options.PickerTimeoutMs.HasValue && lastInputTime.HasValue && (DateTime.UtcNow - lastInputTime.Value).TotalMilliseconds > _options.PickerTimeoutMs.Value)
             {
                 _logger.LogInformation("Account picker timed out after {Ms} ms", _options.PickerTimeoutMs);
                 WriteInfo("Selection cancelled (timeout)");
@@ -65,7 +66,7 @@ public class ConsoleAccountSelectionService : IAccountSelectionService
             }
 
             var key = Console.ReadKey(intercept: true);
-            startTime = _options.PickerTimeoutMs.HasValue ? DateTime.UtcNow : (DateTime?)null;
+            lastInputTime = _options.PickerTimeoutMs.HasValue ? DateTime.UtcNow : (DateTime?)null;
 
             if (key.Key == ConsoleKey.Escape)
             {
@@ -110,16 +111,13 @@ public class ConsoleAccountSelectionService : IAccountSelectionService
             {
                 engine.Top();
             }
+            else if (key.Key == ConsoleKey.Backspace)
+            {
+                engine.Backspace();
+            }
             else if (!char.IsControl(key.KeyChar))
             {
-                if (key.Key == ConsoleKey.Backspace)
-                {
-                    engine.Backspace();
-                }
-                else
-                {
-                    engine.TypeChar(key.KeyChar);
-                }
+                engine.TypeChar(key.KeyChar);
             }
 
             // clamp and adjust window will occur in next loop before draw
@@ -145,7 +143,7 @@ public class ConsoleAccountSelectionService : IAccountSelectionService
         return false;
     }
 
-    private void DrawOverlay(List<FuzzyMatchResult<StorageAccountInfo>> rows, string query, int index, int windowStart, int maxVisible)
+    private void DrawOverlay(IReadOnlyList<FuzzyMatchResult<StorageAccountInfo>> rows, string query, int index, int windowStart, int maxVisible)
     {
         var header = $"Select storage account (type to filter, Enter=select, Esc=cancel)";
         Console.WriteLine();
@@ -167,7 +165,8 @@ public class ConsoleAccountSelectionService : IAccountSelectionService
                 if (idx >= 0)
                 {
                     var before = line[..idx];
-                    var match = line.Substring(idx, Math.Min(query.Length, Math.Max(0, line.Length - idx)));
+                    var matchLength = Math.Min(query.Length, Math.Max(0, line.Length - idx));
+                    var match = line.Substring(idx, matchLength);
                     var after = line[(idx + match.Length)..];
 
                     Console.Write(prefix);

@@ -14,7 +14,8 @@ public class AccountPickerEngine
     public int Index { get; private set; }
     public int WindowStart { get; private set; }
     public int MaxVisible { get; }
-    public List<FuzzyMatchResult<StorageAccountInfo>> Filtered { get; private set; }
+    private List<FuzzyMatchResult<StorageAccountInfo>> _filtered = [];
+    public IReadOnlyList<FuzzyMatchResult<StorageAccountInfo>> Filtered => _filtered;
 
     public AccountPickerEngine(IReadOnlyList<StorageAccountInfo> accounts, IFuzzyMatcher matcher, TerminalSelectionOptions options)
     {
@@ -22,10 +23,10 @@ public class AccountPickerEngine
         _matcher = matcher;
         _options = options;
         MaxVisible = Math.Max(5, options.MaxVisibleItems);
-        Filtered = accounts.Select(a => new FuzzyMatchResult<StorageAccountInfo>(a, 0))
+        _filtered = accounts.Select(a => new FuzzyMatchResult<StorageAccountInfo>(a, 0))
             .OrderBy(a => a.Item.AccountName, StringComparer.OrdinalIgnoreCase)
             .ToList();
-        Index = Filtered.Count > 0 ? 0 : -1;
+        Index = _filtered.Count > 0 ? 0 : -1;
         WindowStart = 0;
     }
 
@@ -49,55 +50,55 @@ public class AccountPickerEngine
 
     public void MoveDown()
     {
-        if (Filtered.Count == 0) return;
-        Index = Math.Min(Index + 1, Filtered.Count - 1);
+        if (_filtered.Count == 0) return;
+        Index = Math.Min(Index + 1, _filtered.Count - 1);
         EnsureWindow();
     }
 
     public void MoveUp()
     {
-        if (Filtered.Count == 0) return;
+        if (_filtered.Count == 0) return;
         Index = Math.Max(Index - 1, 0);
         EnsureWindow();
     }
 
     public void PageDown()
     {
-        if (Filtered.Count == 0) return;
-        Index = Math.Min(Index + MaxVisible, Filtered.Count - 1);
+        if (_filtered.Count == 0) return;
+        Index = Math.Min(Index + MaxVisible, _filtered.Count - 1);
         EnsureWindow();
     }
 
     public void PageUp()
     {
-        if (Filtered.Count == 0) return;
+        if (_filtered.Count == 0) return;
         Index = Math.Max(Index - MaxVisible, 0);
         EnsureWindow();
     }
 
     public void Top()
     {
-        if (Filtered.Count == 0) return;
+        if (_filtered.Count == 0) return;
         Index = 0;
         EnsureWindow();
     }
 
     public void Bottom()
     {
-        if (Filtered.Count == 0) return;
-        Index = Filtered.Count - 1;
+        if (_filtered.Count == 0) return;
+        Index = _filtered.Count - 1;
         EnsureWindow();
     }
 
     public StorageAccountInfo? Current()
     {
-        if (Index < 0 || Index >= Filtered.Count) return null;
-        return Filtered[Index].Item;
+        if (Index < 0 || Index >= _filtered.Count) return null;
+        return _filtered[Index].Item;
     }
 
     public (int start, int end) VisibleWindow()
     {
-        var end = Math.Min(Filtered.Count, WindowStart + MaxVisible);
+        var end = Math.Min(_filtered.Count, WindowStart + MaxVisible);
         return (WindowStart, end);
     }
 
@@ -105,7 +106,7 @@ public class AccountPickerEngine
     {
         if (_options.EnableFuzzySearch && Query.Length > 0)
         {
-            Filtered = _matcher
+            _filtered = _matcher
                 .MatchAndRank(_all, a => [a.AccountName, a.ResourceGroupName ?? string.Empty, a.SubscriptionId?.ToString() ?? string.Empty], Query)
                 .OrderByDescending(r => r.Score)
                 .ThenBy(r => r.Item.AccountName, StringComparer.OrdinalIgnoreCase)
@@ -113,12 +114,12 @@ public class AccountPickerEngine
         }
         else
         {
-            Filtered = _all.Select(a => new FuzzyMatchResult<StorageAccountInfo>(a, 0))
+            _filtered = _all.Select(a => new FuzzyMatchResult<StorageAccountInfo>(a, 0))
                 .OrderBy(a => a.Item.AccountName, StringComparer.OrdinalIgnoreCase)
                 .ToList();
         }
 
-        if (Filtered.Count == 0)
+        if (_filtered.Count == 0)
         {
             Index = -1;
             WindowStart = 0;
@@ -126,7 +127,7 @@ public class AccountPickerEngine
         }
 
         if (Index < 0) Index = 0;
-        if (Index >= Filtered.Count) Index = Filtered.Count - 1;
+        if (Index >= _filtered.Count) Index = _filtered.Count - 1;
         EnsureWindow();
     }
 
@@ -137,4 +138,3 @@ public class AccountPickerEngine
         if (Index >= WindowStart + MaxVisible) WindowStart = Math.Max(0, Index - MaxVisible + 1);
     }
 }
-
