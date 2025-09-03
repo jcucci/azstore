@@ -10,6 +10,9 @@ public static class AzStoreSettingsAssertions
         Assert.NotNull(settings.SessionsDirectory);
         Assert.NotEmpty(settings.SessionsDirectory);
         Assert.Equal(FileConflictBehavior.Overwrite, settings.OnFileConflict);
+        Assert.True(settings.CompareSizeOnConflict);
+        Assert.True(settings.CompareLastModifiedOnConflict);
+        Assert.False(settings.CompareChecksumOnConflict);
         Assert.NotNull(settings.KeyBindings);
         Assert.NotNull(settings.Theme);
         Assert.NotNull(settings.Aliases);

@@ -21,6 +21,7 @@ public class AzureStorageService : IStorageService
     private readonly IAuthenticationService _authenticationService;
     private readonly IPathService _pathService;
     private readonly ISessionManager? _sessionManager;
+    private readonly IFileConflictResolver _conflictResolver;
 
     private readonly Lock _lock = new();
     private BlobServiceClient? _blobServiceClient;
@@ -36,12 +37,14 @@ public class AzureStorageService : IStorageService
     /// <param name="authenticationService">Service for Azure authentication.</param>
     /// <param name="pathService">Service for path calculation and directory management.</param>
     /// <param name="sessionManager">Service for session management (optional).</param>
-    public AzureStorageService(ILogger<AzureStorageService> logger, IAuthenticationService authenticationService, IPathService pathService, ISessionManager? sessionManager = null)
+    /// <param name="conflictResolver">Resolver used when handling local file conflicts.</param>
+    public AzureStorageService(ILogger<AzureStorageService> logger, IAuthenticationService authenticationService, IPathService pathService, ISessionManager? sessionManager = null, IFileConflictResolver? conflictResolver = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _authenticationService = authenticationService ?? throw new ArgumentNullException(nameof(authenticationService));
         _pathService = pathService ?? throw new ArgumentNullException(nameof(pathService));
         _sessionManager = sessionManager;
+        _conflictResolver = conflictResolver ?? new AutoRenameFileConflictResolver();
     }
 
     /// <summary>
@@ -381,11 +384,21 @@ public class AzureStorageService : IStorageService
             var properties = await blobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
             var totalBytes = properties.Value.ContentLength;
             var expectedChecksum = properties.Value.ContentHash?.ToString();
+            var lastModified = properties.Value.LastModified;
 
             progress?.Report(BlobDownloadProgress.Starting(blobName, totalBytes));
 
-            var resolvedFilePath = await ResolveFileConflictAsync(localFilePath, options.ConflictResolution);
-            if (resolvedFilePath == null)
+            var conflictInfo = new FileConflictInfo(
+                LocalExists: File.Exists(localFilePath),
+                LocalSize: File.Exists(localFilePath) ? new FileInfo(localFilePath).Length : null,
+                LocalLastModifiedUtc: File.Exists(localFilePath) ? new FileInfo(localFilePath).LastWriteTimeUtc : null,
+                LocalChecksumMd5: null,
+                RemoteSize: totalBytes,
+                RemoteLastModifiedUtc: lastModified,
+                RemoteChecksumMd5: expectedChecksum);
+
+            var decision = await _conflictResolver.ResolveAsync(localFilePath, options.ConflictResolution, conflictInfo, cancellationToken);
+            if (decision.Skip)
             {
                 return new DownloadResult(
                     BlobName: blobName,
@@ -394,6 +407,7 @@ public class AzureStorageService : IStorageService
                     Success: false,
                     Error: "Download cancelled due to file conflict");
             }
+            var resolvedFilePath = decision.ResolvedPath ?? localFilePath;
 
             if (options.CreateDirectories)
             {
@@ -850,63 +864,7 @@ public class AzureStorageService : IStorageService
         }
     }
 
-    /// <summary>
-    /// Resolves file conflicts based on the specified resolution strategy.
-    /// </summary>
-    /// <param name="filePath">The intended file path.</param>
-    /// <param name="resolution">The conflict resolution strategy.</param>
-    /// <returns>The resolved file path, or null if the user chose to skip.</returns>
-    private async Task<string?> ResolveFileConflictAsync(string filePath, ConflictResolution resolution)
-    {
-        if (!File.Exists(filePath))
-            return filePath;
-
-        return resolution switch
-        {
-            ConflictResolution.Overwrite => filePath,
-            ConflictResolution.Skip => null,
-            ConflictResolution.Rename => GenerateUniqueFileName(filePath),
-            ConflictResolution.Ask => await HandleFileConflictWithRenameAsync(filePath),
-            _ => throw new ArgumentOutOfRangeException(nameof(resolution), resolution, "Invalid conflict resolution strategy")
-        };
-    }
-
-    /// <summary>
-    /// Generates a unique file name by appending a number to avoid conflicts.
-    /// </summary>
-    /// <param name="originalPath">The original file path.</param>
-    /// <returns>A unique file path.</returns>
-    private static string GenerateUniqueFileName(string originalPath)
-    {
-        var directory = Path.GetDirectoryName(originalPath) ?? string.Empty;
-        var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(originalPath);
-        var extension = Path.GetExtension(originalPath);
-
-        var counter = 1;
-        string newPath;
-        do
-        {
-            var newFileName = $"{fileNameWithoutExtension}({counter}){extension}";
-            newPath = Path.Combine(directory, newFileName);
-            counter++;
-        }
-        while (File.Exists(newPath));
-
-        return newPath;
-    }
-
-    /// <summary>
-    /// Handles file conflicts by automatically renaming the file to avoid overwriting.
-    /// This is a placeholder implementation until interactive user input is added.
-    /// </summary>
-    /// <param name="filePath">The file path that conflicts.</param>
-    /// <returns>A unique file path with a renamed filename.</returns>
-    private Task<string?> HandleFileConflictWithRenameAsync(string filePath)
-    {
-        _logger.LogWarning("File already exists: {FilePath}", filePath);
-        _logger.LogInformation("Automatically renaming file to avoid conflict");
-        return Task.FromResult<string?>(GenerateUniqueFileName(filePath));
-    }
+    // Conflict resolution is delegated to IFileConflictResolver.
 
     /// <summary>
     /// Validates the local file state matches the download session and repairs if possible.

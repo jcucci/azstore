@@ -45,6 +45,7 @@ public static class ServiceCollectionExtensions
         });
         services.AddSingleton<IDownloadActivity, DownloadActivity>();
         services.AddSingleton<IReplEngine, ReplEngine>();
+        services.AddSingleton<IFileConflictResolver, ConsoleFileConflictResolver>();
         services.AddSingleton<IFuzzyMatcher, SimpleFuzzyMatcher>();
         services.AddSingleton<IAccountSelectionService, ConsoleAccountSelectionService>();
         services.AddSingleton<IInputHandler>(provider =>

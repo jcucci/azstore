@@ -165,6 +165,33 @@ public class DownloadCommandTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_WithInteractiveSetting_UsesAskConflictResolution()
+    {
+        var interactiveSettings = Options.Create(new AzStore.Configuration.AzStoreSettings
+        {
+            OnFileConflict = AzStore.Configuration.FileConflictBehavior.Interactive
+        });
+
+        var cmd = new DownloadCommand(_logger, _storageService, _pathService, _sessionManager, interactiveSettings);
+
+        var args = new[] { "container", "blob.txt", "/local/path" };
+        var expectedResult = new DownloadResult("blob.txt", "/local/path/blob.txt", 1024, true);
+
+        _storageService.DownloadBlobWithProgressAsync(
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Is<DownloadOptions>(o => o.ConflictResolution == ConflictResolution.Ask),
+            Arg.Any<IProgress<BlobDownloadProgress>>(),
+            Arg.Any<CancellationToken>())
+            .Returns(expectedResult);
+
+        var result = await cmd.ExecuteAsync(args);
+
+        Assert.True(result.Success);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WithNoVerifyOption_DisablesChecksumVerification()
     {
         var args = new[] { "container", "blob.txt", "/local/path", "--no-verify" };

@@ -164,6 +164,7 @@ public class DownloadCommand : ICommand
                 FileConflictBehavior.Overwrite => ConflictResolution.Overwrite,
                 FileConflictBehavior.Skip => ConflictResolution.Skip,
                 FileConflictBehavior.Rename => ConflictResolution.Rename,
+                FileConflictBehavior.Interactive => ConflictResolution.Ask,
                 _ => options.ConflictResolution
             }
         };
