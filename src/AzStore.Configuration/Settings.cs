@@ -17,6 +17,11 @@ public class AzStoreSettings
     [Required]
     public FileConflictBehavior OnFileConflict { get; set; } = FileConflictBehavior.Overwrite;
 
+    // Conflict comparison display settings for interactive prompts
+    public bool CompareSizeOnConflict { get; set; } = true;
+    public bool CompareLastModifiedOnConflict { get; set; } = true;
+    public bool CompareChecksumOnConflict { get; set; } = false;
+
     [Required]
     public KeyBindings KeyBindings { get; set; } = new();
 

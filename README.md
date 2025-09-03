@@ -13,5 +13,19 @@ Quick start
 
 Configuration
 - Sources (in order): `appsettings.json` → TOML file → `AZSTORE_` env vars → CLI flags
-- Default file conflict behavior for downloads: `AzStore.OnFileConflict` (Overwrite | Skip | Rename)
+- Default file conflict behavior for downloads: `AzStore.OnFileConflict` (Overwrite | Skip | Rename | Interactive)
+- Interactive mode shows local vs remote size/date/checksum (configurable)
+- Per-session "remember my choice" supported for interactive prompts
+
+Example TOML (user):
+
+```
+[AzStore]
+SessionsDirectory = "~/Documents/azstore"
+# OnFileConflict can be Overwrite | Skip | Rename | Interactive
+OnFileConflict = "Interactive"
+CompareSizeOnConflict = true
+CompareLastModifiedOnConflict = true
+CompareChecksumOnConflict = false
+```
 - Keybindings, theme, and logging are configurable under the `AzStore` section
