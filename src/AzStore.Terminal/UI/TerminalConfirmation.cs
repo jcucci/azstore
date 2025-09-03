@@ -5,16 +5,6 @@ using Terminal.Gui;
 namespace AzStore.Terminal.UI;
 
 /// <summary>
-/// Represents the result of a confirmation prompt.
-/// </summary>
-public enum ConfirmationResult
-{
-    Yes,
-    No,
-    Cancelled
-}
-
-/// <summary>
 /// Handles terminal-based confirmation prompts with single keypress responses.
 /// </summary>
 public class TerminalConfirmation
