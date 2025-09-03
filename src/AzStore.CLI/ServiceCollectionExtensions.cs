@@ -9,6 +9,7 @@ using AzStore.Terminal.Navigation;
 using AzStore.Terminal.Repl;
 using AzStore.Terminal.UI;
 using AzStore.Terminal.Utilities;
+using AzStore.Terminal.Selection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -44,6 +45,8 @@ public static class ServiceCollectionExtensions
         });
         services.AddSingleton<IDownloadActivity, DownloadActivity>();
         services.AddSingleton<IReplEngine, ReplEngine>();
+        services.AddSingleton<IFuzzyMatcher, SimpleFuzzyMatcher>();
+        services.AddSingleton<IAccountSelectionService, ConsoleAccountSelectionService>();
         services.AddSingleton<IInputHandler>(provider =>
         {
             var logger = provider.GetRequiredService<ILogger<InputHandler>>();
