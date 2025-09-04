@@ -5,6 +5,7 @@ using AzStore.Terminal;
 using AzStore.Terminal.Commands;
 using AzStore.Terminal.Navigation;
 using AzStore.Terminal.Repl;
+using AzStore.Terminal.Theming;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -23,8 +24,9 @@ public static class ReplEngineFixture
         var commandRegistry = Substitute.For<ICommandRegistry>();
         var sessionManager = Substitute.For<ISessionManager>();
         var navigationEngine = Substitute.For<INavigationEngine>();
+        var theme = Substitute.For<IThemeService>();
 
-        return new ReplEngine(options, logger, commandRegistry, sessionManager, navigationEngine);
+        return new ReplEngine(options, logger, commandRegistry, sessionManager, navigationEngine, theme);
     }
 
     public static ReplEngine CreateWithCustomTheme(string promptColor)
@@ -41,7 +43,8 @@ public static class ReplEngineFixture
         var commandRegistry = Substitute.For<ICommandRegistry>();
         var sessionManager = Substitute.For<ISessionManager>();
         var navigationEngine = Substitute.For<INavigationEngine>();
+        var theme = Substitute.For<IThemeService>();
 
-        return new ReplEngine(options, logger, commandRegistry, sessionManager, navigationEngine);
+        return new ReplEngine(options, logger, commandRegistry, sessionManager, navigationEngine, theme);
     }
 }

@@ -19,10 +19,21 @@ on_file_conflict = "overwrite"
 
 # Command aliases for convenience
 [AzStore.aliases]
-# Create shortcuts for commonly used commands
+# Aliases map a short token (what you type) to a full colon-prefixed command.
+# - Values MUST start with a ':' to be treated as commands
+# - Arguments are allowed and will be passed as-is
+# - Examples below are safe to tweak; add your own
+
+# List current container/blob items
 ll = ":ls"
+
+# Exit the application
 quit = ":exit"
-download = ":get"
+q = ":q"
+
+# Download matching files (example of args)
+dl_logs = ":get --glob=*.log"
+dl_all = ":get --all"
 
 # Keyboard bindings configuration
 [AzStore.key_bindings]
@@ -37,16 +48,35 @@ back = "h"
 # Alternative exit key (default: "q")
 exit = "q"
 
-# Theme and color settings
+# Theme and color settings (ConsoleColor names; case-insensitive)
 [AzStore.theme]
-# Color for command prompt (default: "Cyan")
-prompt_color = "Cyan"
-# Color for status messages (default: "Green")
-status_message_color = "Green"
-# Color for error messages (default: "Red")
+# Prompt (e.g., ":" and session path)
+prompt_color = "Green"
+
+# Informational/status messages and progress
+status_message_color = "Cyan"
+
+# Errors and warnings
 error_color = "Red"
-# Color for highlighted selections (default: "Yellow")
+
+# Selected list item highlight color (used as background in TUI)
 selection_color = "Yellow"
+
+# Breadcrumb/path text
+breadcrumb_color = "Gray"
+
+# List item colors (non-selected)
+container_color = "Blue"
+blob_color = "White"
+
+# Titles and headings (e.g., help title)
+title_color = "White"
+
+# Pager/footer status hints
+pager_info_color = "DarkGray"
+
+# Command input echo (e.g., search prompt in pager)
+input_color = "White"
 
 # Logging configuration
 [AzStore.logging]

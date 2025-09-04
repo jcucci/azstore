@@ -4,6 +4,7 @@ using AzStore.Core.Models.Storage;
 using AzStore.Terminal.Input;
 using AzStore.Terminal.Navigation;
 using AzStore.Terminal.UI;
+using AzStore.Terminal.Theming;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -26,8 +27,9 @@ public class TerminalGuiUITests
         var settings = Substitute.For<IOptions<AzStoreSettings>>();
         settings.Value.Returns(new AzStoreSettings());
         var inputHandler = Substitute.For<IInputHandler>();
+        var theme = Substitute.For<IThemeService>();
 
-        var ui = new TerminalGuiUI(logger, loggerFactory, settings, inputHandler);
+        var ui = new TerminalGuiUI(logger, loggerFactory, settings, inputHandler, theme);
 
         Assert.NotNull(ui);
     }
@@ -44,8 +46,9 @@ public class TerminalGuiUITests
         var settings = Substitute.For<IOptions<AzStoreSettings>>();
         settings.Value.Returns(new AzStoreSettings());
         var inputHandler = Substitute.For<IInputHandler>();
+        var theme = Substitute.For<IThemeService>();
 
-        var ui = new TerminalGuiUI(logger, loggerFactory, settings, inputHandler);
+        var ui = new TerminalGuiUI(logger, loggerFactory, settings, inputHandler, theme);
 
         ui.ShowStatus("Test status message");
 
@@ -69,8 +72,9 @@ public class TerminalGuiUITests
         var settings = Substitute.For<IOptions<AzStoreSettings>>();
         settings.Value.Returns(new AzStoreSettings());
         var inputHandler = Substitute.For<IInputHandler>();
+        var theme = Substitute.For<IThemeService>();
 
-        var ui = new TerminalGuiUI(logger, loggerFactory, settings, inputHandler);
+        var ui = new TerminalGuiUI(logger, loggerFactory, settings, inputHandler, theme);
 
         ui.ShowError("Test error message");
 
@@ -94,8 +98,9 @@ public class TerminalGuiUITests
         var settings = Substitute.For<IOptions<AzStoreSettings>>();
         settings.Value.Returns(new AzStoreSettings());
         var inputHandler = Substitute.For<IInputHandler>();
+        var theme = Substitute.For<IThemeService>();
 
-        var ui = new TerminalGuiUI(logger, loggerFactory, settings, inputHandler);
+        var ui = new TerminalGuiUI(logger, loggerFactory, settings, inputHandler, theme);
 
         ui.ShowInfo("Test info message");
 
@@ -119,8 +124,9 @@ public class TerminalGuiUITests
         var settings = Substitute.For<IOptions<AzStoreSettings>>();
         settings.Value.Returns(new AzStoreSettings());
         var inputHandler = Substitute.For<IInputHandler>();
+        var theme = Substitute.For<IThemeService>();
 
-        var ui = new TerminalGuiUI(logger, loggerFactory, settings, inputHandler);
+        var ui = new TerminalGuiUI(logger, loggerFactory, settings, inputHandler, theme);
 
         ui.Shutdown();
 
@@ -145,8 +151,9 @@ public class TerminalGuiUITests
         var settings = Substitute.For<IOptions<AzStoreSettings>>();
         settings.Value.Returns(new AzStoreSettings());
         var inputHandler = Substitute.For<IInputHandler>();
+        var theme = Substitute.For<IThemeService>();
 
-        var ui = new TerminalGuiUI(logger, loggerFactory, settings, inputHandler);
+        var ui = new TerminalGuiUI(logger, loggerFactory, settings, inputHandler, theme);
 
         var items = new List<StorageItem>
         {
@@ -184,8 +191,9 @@ public class TerminalGuiUITests
         var settings = Substitute.For<IOptions<AzStoreSettings>>();
         settings.Value.Returns(new AzStoreSettings());
         var inputHandler = Substitute.For<IInputHandler>();
+        var theme = Substitute.For<IThemeService>();
 
-        var ui = new TerminalGuiUI(logger, loggerFactory, settings, inputHandler);
+        var ui = new TerminalGuiUI(logger, loggerFactory, settings, inputHandler, theme);
 
         var items = new List<StorageItem>
         {

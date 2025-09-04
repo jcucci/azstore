@@ -10,6 +10,7 @@ using AzStore.Terminal.Repl;
 using AzStore.Terminal.UI;
 using AzStore.Terminal.Utilities;
 using AzStore.Terminal.Selection;
+using AzStore.Terminal.Theming;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -48,6 +49,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IFileConflictResolver, ConsoleFileConflictResolver>();
         services.AddSingleton<IFuzzyMatcher, SimpleFuzzyMatcher>();
         services.AddSingleton<IAccountSelectionService, ConsoleAccountSelectionService>();
+        services.AddSingleton<IThemeService, ThemeService>();
         services.AddSingleton<IInputHandler>(provider =>
         {
             var logger = provider.GetRequiredService<ILogger<InputHandler>>();

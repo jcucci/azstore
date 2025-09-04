@@ -206,6 +206,16 @@ Complete development environment setup:
 - Interface-driven architecture with comprehensive DI container setup
 - **Test coverage**: 156+ tests including comprehensive model validation, edge cases, and paging functionality
 
+## Theming Guidance
+
+- **No hard-coded colors**: Use a theme abstraction instead of `Console.ForegroundColor` in feature code. Routing all color writes through the theme ensures consistency and configurability.
+- **Tokens, not literals**: Code should request a semantic token (e.g., Prompt, Status, Error, Selection) and let the theme resolve the color.
+- **Service-first**: Prefer an `IThemeService` to resolve tokens and write colored output. Until the service lands, use the REPL helpers (`WritePrompt`, `WriteStatus`, `WriteError`) and avoid direct color changes.
+- **Extend `ThemeSettings`**: Add new properties for tokens rather than introducing ad-hoc config flags. Keep old names mapped for backwards compatibility.
+- **Terminal.Gui mapping**: For TUI overlays, map tokens to `ColorScheme` via the theme service instead of setting attributes inline.
+- **Add tokens when needed**: If a new UI surface needs color, propose a new token and update docs before coding.
+- **Docs**: See `docs/THEMING.md` for architecture, tokens, defaults, and examples.
+
 ## Lessons Learned
 
 ### Azure SDK Pagination Best Practices

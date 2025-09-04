@@ -1,0 +1,17 @@
+# Catppuccin Latte (light) — ConsoleColor approximations
+# Reference: https://github.com/catppuccin/catppuccin
+# Flavors: Latte, Frappé, Macchiato, Mocha
+# Note: AzStore currently uses ConsoleColor names; mappings below approximate the palette.
+
+[AzStore.theme]
+prompt_color = "Blue"           # sky / sapphire
+status_message_color = "Cyan"   # teal/sky adjacent
+error_color = "Red"             # red
+selection_color = "Yellow"      # highlight
+breadcrumb_color = "Gray"       # subtext
+container_color = "Blue"        # blue
+blob_color = "White"            # text
+title_color = "White"           # title
+pager_info_color = "DarkGray"   # overlay
+input_color = "White"           # input echo
+

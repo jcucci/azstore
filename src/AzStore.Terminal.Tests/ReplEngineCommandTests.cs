@@ -3,6 +3,7 @@ using AzStore.Core.Services.Abstractions;
 using AzStore.Terminal.Commands;
 using AzStore.Terminal.Navigation;
 using AzStore.Terminal.Repl;
+using AzStore.Terminal.Theming;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -20,8 +21,9 @@ public class ReplEngineCommandTests
         var commandRegistry = Substitute.For<ICommandRegistry>();
         var sessionManager = Substitute.For<ISessionManager>();
         var navigationEngine = Substitute.For<INavigationEngine>();
+        var theme = Substitute.For<IThemeService>();
 
-        var replEngine = new ReplEngine(settings, logger, commandRegistry, sessionManager, navigationEngine);
+        var replEngine = new ReplEngine(settings, logger, commandRegistry, sessionManager, navigationEngine, theme);
 
         Assert.NotNull(replEngine);
     }

@@ -14,13 +14,14 @@ public class TerminalConfirmation
     /// </summary>
     /// <param name="message">The confirmation message to display.</param>
     /// <param name="defaultChoice">The default choice when Enter is pressed ('Y' or 'N').</param>
+    /// <param name="theme">Optional theme service for colored prompts.</param>
     /// <returns>The user's confirmation choice.</returns>
-    public static ConfirmationResult ShowConfirmation(string message, char defaultChoice = 'Y')
+    public static ConfirmationResult ShowConfirmation(string message, char defaultChoice = 'Y', AzStore.Terminal.Theming.IThemeService? theme = null)
     {
         var prompt = TerminalProgressRenderer.RenderConfirmationPrompt(message, defaultChoice);
 
         // Display the prompt
-        Console.Write(prompt);
+        if (theme != null) theme.Write(prompt, AzStore.Terminal.Theming.ThemeToken.Status); else Console.Write(prompt);
         Console.Out.Flush();
 
         try
@@ -66,26 +67,26 @@ public class TerminalConfirmation
     /// </summary>
     /// <param name="fileName">The name of the file to download.</param>
     /// <param name="fileSize">The size of the file in bytes.</param>
+    /// <param name="theme">Optional theme service for colored prompts.</param>
     /// <returns>The user's confirmation choice.</returns>
-    public static ConfirmationResult ShowDownloadConfirmation(string fileName, long? fileSize = null)
+    public static ConfirmationResult ShowDownloadConfirmation(string fileName, long? fileSize = null, AzStore.Terminal.Theming.IThemeService? theme = null)
     {
         var sizeText = fileSize.HasValue ? $" ({TerminalUtils.FormatBytes(fileSize.Value)})" : "";
         var message = $"Download '{fileName}'{sizeText}?";
-
-        return ShowConfirmation(message);
+        return ShowConfirmation(message, theme: theme);
     }
 
     /// <summary>
     /// Shows a confirmation prompt for file overwrite operations.
     /// </summary>
     /// <param name="filePath">The path of the existing file.</param>
+    /// <param name="theme">Optional theme service for colored prompts.</param>
     /// <returns>The user's confirmation choice.</returns>
-    public static ConfirmationResult ShowOverwriteConfirmation(string filePath)
+    public static ConfirmationResult ShowOverwriteConfirmation(string filePath, AzStore.Terminal.Theming.IThemeService? theme = null)
     {
         var fileName = Path.GetFileName(filePath);
         var message = $"'{fileName}' already exists. Overwrite?";
-
-        return ShowConfirmation(message, 'N'); // Default to No for destructive operations
+        return ShowConfirmation(message, defaultChoice: 'N', theme: theme); // Default to No for destructive operations
     }
 
     /// <summary>
@@ -94,15 +95,16 @@ public class TerminalConfirmation
     /// <param name="message">The confirmation message.</param>
     /// <param name="options">Dictionary of key characters to their descriptions.</param>
     /// <param name="defaultKey">The default key when Enter is pressed.</param>
+    /// <param name="theme">Optional theme service for colored prompts.</param>
     /// <returns>The chosen key character, or null if cancelled.</returns>
-    public static char? ShowCustomConfirmation(string message, Dictionary<char, string> options, char? defaultKey = null)
+    public static char? ShowCustomConfirmation(string message, Dictionary<char, string> options, char? defaultKey = null, AzStore.Terminal.Theming.IThemeService? theme = null)
     {
         var optionsList = options.Select(kv =>
             kv.Key == defaultKey ? $"[{char.ToUpper(kv.Key)}]" : $"{char.ToLower(kv.Key)}").ToList();
         var optionsText = string.Join("/", optionsList);
 
         var prompt = $"{message} {optionsText}: ";
-        Console.Write(prompt);
+        if (theme != null) theme.Write(prompt, AzStore.Terminal.Theming.ThemeToken.Status); else Console.Write(prompt);
         Console.Out.Flush();
 
         try
@@ -144,8 +146,9 @@ public class TerminalConfirmation
     /// Shows a conflict resolution prompt for file downloads.
     /// </summary>
     /// <param name="fileName">The name of the conflicting file.</param>
+    /// <param name="theme">Optional theme service for colored prompts.</param>
     /// <returns>The chosen resolution option.</returns>
-    public static char? ShowConflictResolutionPrompt(string fileName)
+    public static char? ShowConflictResolutionPrompt(string fileName, AzStore.Terminal.Theming.IThemeService? theme = null)
     {
         var options = new Dictionary<char, string>
         {
@@ -155,7 +158,7 @@ public class TerminalConfirmation
         };
 
         var message = $"'{fileName}' already exists.";
-        return ShowCustomConfirmation(message, options, 'S'); // Default to Skip
+        return ShowCustomConfirmation(message, options, defaultKey: 'S', theme: theme); // Default to Skip
     }
 
     /// <summary>
@@ -171,6 +174,7 @@ public class TerminalConfirmation
     /// <param name="showSize">Show size comparison.</param>
     /// <param name="showDate">Show date comparison.</param>
     /// <param name="showChecksum">Show checksum comparison.</param>
+    /// <param name="theme">Optional theme service for colored prompts.</param>
     /// <returns>Conflict prompt result with decision and flags.</returns>
     public static ConflictPromptResult ShowDetailedConflictResolutionPrompt(
         string fileName,
@@ -182,10 +186,11 @@ public class TerminalConfirmation
         string? remoteChecksum,
         bool showSize,
         bool showDate,
-        bool showChecksum)
+        bool showChecksum,
+        AzStore.Terminal.Theming.IThemeService? theme = null)
     {
         Console.WriteLine();
-        Console.WriteLine($"File exists: {fileName}");
+        if (theme != null) theme.WriteLine($"File exists: {fileName}", AzStore.Terminal.Theming.ThemeToken.Title); else Console.WriteLine($"File exists: {fileName}");
 
         if (showSize)
         {
@@ -210,7 +215,7 @@ public class TerminalConfirmation
 
         Console.WriteLine();
         Console.WriteLine("Choose: [O]verwrite, [S]kip, [R]ename");
-        Console.Write("Selection (default S): ");
+        if (theme != null) theme.Write("Selection (default S): ", AzStore.Terminal.Theming.ThemeToken.Status); else Console.Write("Selection (default S): ");
         var key = Console.ReadKey(true);
         Console.WriteLine();
 
@@ -218,8 +223,8 @@ public class TerminalConfirmation
         if (choice != 'O' && choice != 'S' && choice != 'R')
             choice = 'S';
 
-        bool applyAll = AskYesNo("Apply to all conflicts in this session? (y/N): ", defaultYes: false);
-        bool remember = AskYesNo("Remember this choice for this session? (y/N): ", defaultYes: false);
+        bool applyAll = AskYesNo("Apply to all conflicts in this session? (y/N): ", defaultYes: false, theme);
+        bool remember = AskYesNo("Remember this choice for this session? (y/N): ", defaultYes: false, theme);
 
         var decision = choice switch
         {
@@ -231,9 +236,9 @@ public class TerminalConfirmation
         return new ConflictPromptResult(decision, applyAll, remember);
     }
 
-    private static bool AskYesNo(string prompt, bool defaultYes)
+    private static bool AskYesNo(string prompt, bool defaultYes, AzStore.Terminal.Theming.IThemeService? theme = null)
     {
-        Console.Write(prompt);
+        if (theme != null) theme.Write(prompt, AzStore.Terminal.Theming.ThemeToken.Status); else Console.Write(prompt);
         var key = Console.ReadKey(true);
         Console.WriteLine();
 

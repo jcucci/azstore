@@ -9,6 +9,7 @@ using AzStore.Terminal.Input;
 using AzStore.Terminal.UI;
 using AzStore.Terminal.Utilities;
 using Microsoft.Extensions.Logging;
+using AzStore.Terminal.Theming;
 
 namespace AzStore.Terminal.Navigation;
 
@@ -24,6 +25,7 @@ public class NavigationEngine : INavigationEngine
     private readonly IPathService _pathService;
     private readonly HelpTextGenerator _helpTextGenerator;
     private readonly IDownloadActivity _downloadActivity;
+    private readonly IThemeService _theme;
 
     private Session? _currentSession;
     private NavigationState? _currentState;
@@ -67,13 +69,15 @@ public class NavigationEngine : INavigationEngine
     /// <param name="pathService">The path service for calculating download paths.</param>
     /// <param name="helpTextGenerator">Generates formatted help text for keybindings and commands.</param>
     /// <param name="downloadActivity">Tracks active downloads for exit prompts.</param>
+    /// <param name="theme">Theme service for rendering colored UI elements.</param>
     public NavigationEngine(
         IStorageService storageService,
         ILogger<NavigationEngine> logger,
         VimNavigator vimNavigator,
         IPathService pathService,
         HelpTextGenerator helpTextGenerator,
-        IDownloadActivity downloadActivity)
+        IDownloadActivity downloadActivity,
+        IThemeService theme)
     {
         _storageService = storageService ?? throw new ArgumentNullException(nameof(storageService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -81,6 +85,7 @@ public class NavigationEngine : INavigationEngine
         _pathService = pathService ?? throw new ArgumentNullException(nameof(pathService));
         _helpTextGenerator = helpTextGenerator ?? throw new ArgumentNullException(nameof(helpTextGenerator));
         _downloadActivity = downloadActivity ?? throw new ArgumentNullException(nameof(downloadActivity));
+        _theme = theme ?? throw new ArgumentNullException(nameof(theme));
 
         // Wire up VIM navigator events
         _vimNavigator.ModeChanged += OnVimNavigatorModeChanged;
@@ -252,7 +257,7 @@ public class NavigationEngine : INavigationEngine
             return;
         }
 
-        Console.WriteLine($"\n{GetBreadcrumbPath()} ({GetPageInfo()})");
+        _theme.WriteLine($"\n{GetBreadcrumbPath()} ({GetPageInfo()})", ThemeToken.Breadcrumb);
         Console.WriteLine(new string('-', 60));
 
         for (int i = 0; i < _currentItems.Count; i++)
@@ -261,22 +266,24 @@ public class NavigationEngine : INavigationEngine
             var isSelected = i == _currentState.SelectedIndex;
             var prefix = isSelected ? "► " : "  ";
 
-            Console.ForegroundColor = isSelected ? ConsoleColor.Yellow : ConsoleColor.White;
+            var token = isSelected
+                ? ThemeToken.Selection
+                : item.Type == NavigationItemType.Container
+                    ? ThemeToken.ItemContainer
+                    : ThemeToken.ItemBlob;
 
             switch (item.Type)
             {
                 case NavigationItemType.Container:
-                    Console.WriteLine($"{prefix}📁 {item.Name}");
+                    _theme.WriteLine($"{prefix}📁 {item.Name}", token);
                     break;
                 case NavigationItemType.BlobFile:
-                    Console.WriteLine($"{prefix}📄 {item.Name} ({TerminalUtils.FormatSize(item.Size ?? 0)})");
+                    _theme.WriteLine($"{prefix}📄 {item.Name} ({TerminalUtils.FormatSize(item.Size ?? 0)})", token);
                     break;
                 case NavigationItemType.BlobPrefix:
-                    Console.WriteLine($"{prefix}📁 {item.Name}/");
+                    _theme.WriteLine($"{prefix}📁 {item.Name}/", token);
                     break;
             }
-
-            Console.ResetColor();
         }
 
         Console.WriteLine();
@@ -456,7 +463,7 @@ public class NavigationEngine : INavigationEngine
             }
 
             // Show confirmation prompt
-            var confirmation = TerminalConfirmation.ShowDownloadConfirmation(selectedItem.Name, blob.Size);
+            var confirmation = TerminalConfirmation.ShowDownloadConfirmation(selectedItem.Name, blob.Size, _theme);
             if (confirmation != ConfirmationResult.Yes)
             {
                 _logger.LogDebug("Download cancelled by user");
@@ -472,7 +479,7 @@ public class NavigationEngine : INavigationEngine
             // Check for conflicts
             if (File.Exists(targetPath))
             {
-                var conflictResolution = TerminalConfirmation.ShowConflictResolutionPrompt(Path.GetFileName(targetPath));
+                var conflictResolution = TerminalConfirmation.ShowConflictResolutionPrompt(Path.GetFileName(targetPath), _theme);
                 switch (conflictResolution)
                 {
                     case 'S': // Skip
@@ -499,7 +506,8 @@ public class NavigationEngine : INavigationEngine
             var progress = new Progress<BlobDownloadProgress>(progressInfo =>
             {
                 var progressText = TerminalProgressRenderer.RenderBlobDownloadProgress(progressInfo);
-                Console.Write($"\r{progressText}");
+                Console.Write("\r");
+                _theme.Write(progressText, ThemeToken.Status);
                 Console.Out.Flush();
             });
 
@@ -642,7 +650,7 @@ public class NavigationEngine : INavigationEngine
                 ? full
                 : contextual.TrimEnd() + Environment.NewLine + Environment.NewLine + full;
 
-            TerminalPager.Show(title, combined);
+            TerminalPager.Show(title, combined, _theme);
         }
         catch (Exception ex)
         {

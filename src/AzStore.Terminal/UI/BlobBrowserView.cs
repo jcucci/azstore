@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Terminal.Gui;
 using System.Collections.ObjectModel;
 using KeyBindingsConfig = AzStore.Configuration.KeyBindings;
+using AzStore.Terminal.Theming;
 
 namespace AzStore.Terminal.UI;
 
@@ -16,6 +17,7 @@ public class BlobBrowserView : View
     private readonly ILogger<BlobBrowserView> _logger;
     private readonly KeyBindingsConfig _keyBindings;
     private readonly IInputHandler _inputHandler;
+    private readonly IThemeService _theme;
     private readonly ObservableCollection<string> _displayItems = [];
 
     private ListView? _listView;
@@ -29,11 +31,12 @@ public class BlobBrowserView : View
 
     public event EventHandler<NavigationResult>? NavigationRequested;
 
-    public BlobBrowserView(ILogger<BlobBrowserView> logger, KeyBindingsConfig keyBindings, IInputHandler inputHandler)
+    public BlobBrowserView(ILogger<BlobBrowserView> logger, KeyBindingsConfig keyBindings, IInputHandler inputHandler, IThemeService theme)
     {
         _logger = logger;
         _keyBindings = keyBindings;
         _inputHandler = inputHandler;
+        _theme = theme;
 
         // Subscribe to input handler events
         _inputHandler.NavigationRequested += OnNavigationRequested;
@@ -55,6 +58,7 @@ public class BlobBrowserView : View
             Height = 1,
             Text = "Azure Storage"
         };
+        _breadcrumbLabel.ColorScheme = _theme.GetLabelColorScheme(ThemeToken.Breadcrumb);
         Add(_breadcrumbLabel);
 
         _listView = new ListView()
@@ -67,6 +71,7 @@ public class BlobBrowserView : View
             AllowsMultipleSelection = false
         };
         _listView.SetSource(_displayItems);
+        _listView.ColorScheme = _theme.GetListColorScheme();
         Add(_listView);
 
         _statusLabel = new Label()
@@ -77,6 +82,7 @@ public class BlobBrowserView : View
             Height = 1,
             Text = $"{_keyBindings.MoveDown}/{_keyBindings.MoveUp}: navigate, {_keyBindings.Enter}/Enter: select, {_keyBindings.Back}: back, {_keyBindings.Search}: search, {_keyBindings.Command}: command"
         };
+        _statusLabel.ColorScheme = _theme.GetLabelColorScheme(ThemeToken.PagerInfo);
         Add(_statusLabel);
     }
 
