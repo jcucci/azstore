@@ -5,6 +5,7 @@ using AzStore.Terminal.Utilities;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using AzStore.Terminal.Theming;
+using System.Linq;
 
 namespace AzStore.Terminal.Selection;
 
@@ -15,18 +16,21 @@ public class ConsoleAccountSelectionService : IAccountSelectionService
     private readonly TerminalSelectionOptions _options;
     private readonly IFuzzyMatcher _matcher;
     private readonly IThemeService _theme;
+    private readonly IConsoleLogScope _consoleLogScope;
 
     public ConsoleAccountSelectionService(
         ILogger<ConsoleAccountSelectionService> logger,
         IOptions<AzStoreSettings> settings,
         IFuzzyMatcher matcher,
-        IThemeService theme)
+        IThemeService theme,
+        IConsoleLogScope consoleLogScope)
     {
         _logger = logger;
         _keyBindings = settings.Value.KeyBindings;
         _options = settings.Value.Selection;
         _matcher = matcher;
         _theme = theme;
+        _consoleLogScope = consoleLogScope;
     }
 
     public async Task<StorageAccountInfo?> PickAsync(IReadOnlyList<StorageAccountInfo> accounts, CancellationToken cancellationToken = default)
@@ -51,20 +55,43 @@ public class ConsoleAccountSelectionService : IAccountSelectionService
         // Treat picker timeout as an inactivity timeout; reset on keypress
         var lastInputTime = _options.PickerTimeoutMs.HasValue ? DateTime.UtcNow : (DateTime?)null;
 
-        while (true)
+        // Track whether we've drawn the overlay to avoid duplicating output
+        var overlayDrawn = false;
+        var overlayLines = 0;
+
+        bool? prevCursorVisible = null;
+        // Suppress console logging while the interactive picker is active to avoid visual interference
+        using var __suppressLogs = _consoleLogScope.Suppress();
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            #pragma warning disable CA1416
+            try { prevCursorVisible = Console.CursorVisible; } catch { /* ignore on unsupported platforms */ }
+            try { Console.CursorVisible = false; } catch { /* ignore */ }
+            #pragma warning restore CA1416
+
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
             if (_options.PickerTimeoutMs.HasValue && lastInputTime.HasValue && (DateTime.UtcNow - lastInputTime.Value).TotalMilliseconds > _options.PickerTimeoutMs.Value)
             {
                 _logger.LogInformation("Account picker timed out after {Ms} ms", _options.PickerTimeoutMs);
+                if (overlayDrawn)
+                {
+                    ClearOverlay(maxVisible + 5);
+                }
                 Console.WriteLine("Selection cancelled (timeout)");
                 return null;
             }
 
-            DrawOverlay(engine.Filtered, engine.Query, engine.Index, engine.WindowStart, maxVisible);
-
+            // Only draw when needed: initially, and after handling a keypress
             if (!Console.KeyAvailable)
             {
+                if (!overlayDrawn)
+                {
+                    overlayLines = DrawOverlay(engine.Filtered, engine.Query, engine.Index, engine.WindowStart, maxVisible);
+                    overlayDrawn = true;
+                }
                 await Task.Delay(10, cancellationToken);
                 continue;
             }
@@ -75,7 +102,10 @@ public class ConsoleAccountSelectionService : IAccountSelectionService
             if (key.Key == ConsoleKey.Escape)
             {
                 _logger.LogInformation("User cancelled account selection");
-                ClearOverlay(maxVisible + 5);
+                if (overlayDrawn)
+                {
+                    ClearOverlay(overlayLines);
+                }
                 Console.WriteLine("Selection cancelled");
                 return null;
             }
@@ -86,7 +116,10 @@ public class ConsoleAccountSelectionService : IAccountSelectionService
                 var chosen = engine.Current();
                 if (chosen == null) continue;
                 _logger.LogInformation("User selected storage account: {Account} ({SubscriptionId})", chosen.AccountName, chosen.SubscriptionId);
-                ClearOverlay(maxVisible + 5);
+                if (overlayDrawn)
+                {
+                    ClearOverlay(overlayLines);
+                }
                 return chosen;
             }
 
@@ -124,7 +157,23 @@ public class ConsoleAccountSelectionService : IAccountSelectionService
                 engine.TypeChar(key.KeyChar);
             }
 
-            // clamp and adjust window will occur in next loop before draw
+                // Redraw overlay to reflect changes, clearing previous overlay first
+                if (overlayDrawn)
+                {
+                    ClearOverlay(overlayLines);
+                }
+                overlayLines = DrawOverlay(engine.Filtered, engine.Query, engine.Index, engine.WindowStart, maxVisible);
+                overlayDrawn = true;
+            }
+        }
+        finally
+        {
+            if (prevCursorVisible.HasValue)
+            {
+                #pragma warning disable CA1416
+                try { Console.CursorVisible = prevCursorVisible.Value; } catch { /* ignore */ }
+                #pragma warning restore CA1416
+            }
         }
     }
 
@@ -147,53 +196,75 @@ public class ConsoleAccountSelectionService : IAccountSelectionService
         return false;
     }
 
-    private void DrawOverlay(IReadOnlyList<FuzzyMatchResult<StorageAccountInfo>> rows, string query, int index, int windowStart, int maxVisible)
+    private int DrawOverlay(IReadOnlyList<FuzzyMatchResult<StorageAccountInfo>> rows, string query, int index, int windowStart, int maxVisible)
     {
-        var header = $"Select storage account (type to filter, Enter=select, Esc=cancel)";
-        Console.WriteLine();
-        Console.WriteLine(header);
-        Console.WriteLine($"Filter: {query}");
+        var header = "Select storage account (type to filter, Enter=select, Esc=cancel)";
+        int lines = 0;
+        // Header
+        _theme.WriteLine(header, ThemeToken.Title); lines++;
+        _theme.WriteLine($"Filter: {query}", ThemeToken.Status); lines++;
 
         var end = Math.Min(rows.Count, windowStart + maxVisible);
+
+        // Compute column widths for visible window to align vertically
+        var visible = new List<StorageAccountInfo>(Math.Max(0, end - windowStart));
+        for (int i = windowStart; i < end; i++) visible.Add(rows[i].Item);
+
+        var consoleWidth = 0;
+        try { consoleWidth = Console.WindowWidth; } catch { consoleWidth = 0; }
+        if (consoleWidth <= 0) consoleWidth = 100;
+
+        var maxName = visible.Count > 0 ? visible.Max(v => (v.AccountName ?? string.Empty).Length) : 0;
+        var maxRg = visible.Count > 0 ? visible.Max(v => (v.ResourceGroupName ?? string.Empty).Length) : 0;
+        var subWidth = 10; // e.g., "[1234abcd]" => fixed column
+
+        // Budget columns to avoid wrapping in narrow terminals
+        var padding = 2; // spaces between columns
+        var prefixWidth = 2; // "> " or two spaces
+        // Keep total printed length strictly less than the window width to avoid soft-wrapping
+        var budget = Math.Max(10, consoleWidth - prefixWidth - padding * 2 - subWidth - 1);
+        var nameWidth = Math.Min(maxName, Math.Max(8, budget / 2));
+        var rgWidth = Math.Min(maxRg, Math.Max(8, budget - nameWidth));
+        if (nameWidth + rgWidth > budget)
+        {
+            rgWidth = Math.Max(0, budget - nameWidth);
+        }
+
         for (int i = windowStart; i < end; i++)
         {
             var item = rows[i].Item;
             var prefix = (i == index) ? "> " : "  ";
-            var line = $"{item.AccountName}  [{item.SubscriptionId}]  {item.ResourceGroupName ?? ""}";
-            line = Truncate(line, Console.WindowWidth - 4);
+            var subText = item.SubscriptionId?.ToString() ?? string.Empty;
+            var subShort = subText.Length >= 8 ? subText[..8] : subText;
+            var rg = item.ResourceGroupName ?? string.Empty;
 
-            // write with optional highlighting of first substring occurrence
-            if (_options.HighlightMatches && !string.IsNullOrEmpty(query))
+            // Prepare padded columns (truncate if needed)
+            var nameCol = Truncate(item.AccountName, nameWidth).PadRight(nameWidth);
+            var subCol = ($"[{subShort}]").PadRight(subWidth);
+            var rgCol = Truncate(rg, rgWidth).PadRight(rgWidth);
+
+            Console.Write(prefix);
+            if (i == index)
             {
-                var idx = line.IndexOf(query, StringComparison.OrdinalIgnoreCase);
-                if (idx >= 0)
-                {
-                    var before = line[..idx];
-                    var matchLength = Math.Min(query.Length, Math.Max(0, line.Length - idx));
-                    var match = line.Substring(idx, matchLength);
-                    var after = line[(idx + match.Length)..];
-
-                    Console.Write(prefix);
-                    Console.Write(before);
-                    var c = Console.ForegroundColor;
-                    Console.ForegroundColor = _theme.ResolveForeground(ThemeToken.Status);
-                    Console.Write(match);
-                    Console.ForegroundColor = c;
-                    Console.WriteLine(after);
-                    continue;
-                }
+                _theme.Write(nameCol, ThemeToken.Selection);
             }
-
-            Console.WriteLine(prefix + line);
+            else
+            {
+                _theme.Write(nameCol, ThemeToken.Status);
+            }
+            Console.Write(new string(' ', padding));
+            _theme.Write(subCol, ThemeToken.Prompt);
+            Console.Write(new string(' ', padding));
+            _theme.Write(rgCol, ThemeToken.Status);
+            Console.WriteLine();
+            lines++;
         }
 
-        // clear remaining area if fewer than maxVisible
-        for (int i = end; i < windowStart + maxVisible; i++)
-        {
-            Console.WriteLine("~");
-        }
-
-        Console.WriteLine();
+        // Footer spacer
+        // Do not append multiple blank lines to avoid visual gaps
+        // Console.WriteLine();
+        // lines++;
+        return lines;
     }
 
     private void ClearOverlay(int lines)
@@ -202,7 +273,11 @@ public class ConsoleAccountSelectionService : IAccountSelectionService
         for (int i = 0; i < lines; i++)
         {
             Console.SetCursorPosition(0, Math.Max(Console.CursorTop - 1, 0));
-            Console.Write(new string(' ', Console.WindowWidth));
+            // Avoid writing exactly WindowWidth spaces to prevent implicit line-wrapping in some terminals
+            var width = 0;
+            try { width = Console.WindowWidth; } catch { width = 0; }
+            if (width <= 1) width = 80;
+            Console.Write(new string(' ', width - 1));
             Console.SetCursorPosition(0, Math.Max(Console.CursorTop - 1, 0));
         }
     }
