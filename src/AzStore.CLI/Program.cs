@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Serilog;
+using Serilog.Core;
 using Serilog.Formatting.Compact;
 using System.CommandLine;
 using System.CommandLine.Parsing;
@@ -49,9 +50,13 @@ public class Program
         var builder = Host.CreateApplicationBuilder();
         
         ConfigureConfiguration(builder.Configuration, parsedArgs);
-        ConfigureSerilog(builder.Configuration);
+        var consoleLevelSwitch = new LoggingLevelSwitch();
+        ConfigureSerilog(builder.Configuration, consoleLevelSwitch);
         
         builder.Services.AddSerilog();
+        // Make the console level switch and console log scope available to services
+        builder.Services.AddSingleton(consoleLevelSwitch);
+        builder.Services.AddSingleton<AzStore.Terminal.Utilities.IConsoleLogScope>(sp => new SerilogConsoleLogScope(consoleLevelSwitch));
         builder.Services.AddAzStoreServices();
 
         var host = builder.Build();
@@ -107,7 +112,7 @@ public class Program
         }
     }
 
-    private static void ConfigureSerilog(IConfiguration configuration)
+    private static void ConfigureSerilog(IConfiguration configuration, LoggingLevelSwitch consoleLevelSwitch)
     {
         var loggingSettings = new LoggingSettings();
         configuration.GetSection($"{AzStoreSettings.SectionName}:Logging").Bind(loggingSettings);
@@ -117,7 +122,10 @@ public class Program
 
         if (loggingSettings.EnableConsoleLogging)
         {
+            // Use a level switch for console so we can temporarily suppress during interactive pickers
+            consoleLevelSwitch.MinimumLevel = loggingSettings.LogLevel;
             loggerConfig.WriteTo.Console(
+                levelSwitch: consoleLevelSwitch,
                 outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}");
         }
 

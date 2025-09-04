@@ -6,6 +6,8 @@ using AzStore.Core.Models.Authentication;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using AzStore.Core.Services.Abstractions;
+using Azure.ResourceManager.Resources;
+using Azure;
 
 namespace AzStore.Core.Services.Implementations;
 
@@ -42,15 +44,28 @@ public class AuthenticationService : IAuthenticationService
             var credential = GetCredential();
             var armClient = GetArmClient(credential);
 
-            var subscription = await armClient.GetDefaultSubscriptionAsync(cancellationToken);
-            await subscription.GetAsync(cancellationToken);
+            var cliDefault = await TryGetCliDefaultSubscriptionIdAsync(cancellationToken);
+            SubscriptionResource subscription;
+            if (cliDefault.HasValue && cliDefault.Value != Guid.Empty)
+            {
+                _logger.LogDebug("Using Azure CLI default subscription {SubscriptionId}", cliDefault);
+                var resourceIdentifier = new ResourceIdentifier($"/subscriptions/{cliDefault.Value}");
+                subscription = armClient.GetSubscriptionResource(resourceIdentifier);
+            }
+            else
+            {
+                _logger.LogDebug("Falling back to ARM default subscription");
+                subscription = await armClient.GetDefaultSubscriptionAsync(cancellationToken);
+            }
+            var subResponse = await subscription.GetAsync(cancellationToken);
+            var subData = subResponse.Value.Data;
 
-            var tenantIdText = subscription.Data.TenantId?.ToString();
+            var tenantIdText = subData.TenantId?.ToString();
             var result = AuthenticationResult.Successful(
                 accessToken: "*** (hidden for security)",
-                subscriptionId: subscription.Id.SubscriptionId != null ? Guid.Parse(subscription.Id.SubscriptionId) : null,
+                subscriptionId: subResponse.Value.Id.SubscriptionId != null ? Guid.Parse(subResponse.Value.Id.SubscriptionId) : null,
                 tenantId: tenantIdText != null ? Guid.Parse(tenantIdText) : null,
-                accountName: subscription.Data.DisplayName,
+                accountName: subData.DisplayName,
                 expiresOn: DateTime.UtcNow.AddHours(1)
             );
 
@@ -59,18 +74,18 @@ public class AuthenticationService : IAuthenticationService
                 _cachedResult = result;
             }
 
-            _logger.LogInformation("Successfully authenticated with Azure CLI. Subscription: {SubscriptionName} ({SubscriptionId})",
-                subscription.Data.DisplayName, subscription.Data.SubscriptionId);
+            _logger.LogInformation("Successfully authenticated. Subscription: {SubscriptionName} ({SubscriptionId})",
+                subData.DisplayName, subData.SubscriptionId);
 
             return result;
         }
-        catch (Azure.RequestFailedException ex) when (ex.Status == 401 || ex.Status == 403)
+        catch (RequestFailedException ex) when (ex.Status == 401 || ex.Status == 403)
         {
             var errorMsg = "Azure CLI authentication failed. Please run 'az login' to authenticate";
             _logger.LogError(ex, "Authentication failed: {Error}", errorMsg);
             return AuthenticationResult.Failed(errorMsg);
         }
-        catch (Azure.Identity.CredentialUnavailableException ex)
+        catch (CredentialUnavailableException ex)
         {
             var errorMsg = "Azure CLI is not authenticated. Please run 'az login' to authenticate";
             _logger.LogError(ex, "Credential unavailable: {Error}", errorMsg);
@@ -103,14 +118,15 @@ public class AuthenticationService : IAuthenticationService
 
             var resourceIdentifier = new ResourceIdentifier($"/subscriptions/{subscriptionId}");
             var subscription = armClient.GetSubscriptionResource(resourceIdentifier);
-            await subscription.GetAsync(cancellationToken);
+            var subResponse = await subscription.GetAsync(cancellationToken);
+            var subData = subResponse.Value.Data;
 
-            var tenantIdText = subscription.Data.TenantId?.ToString();
+            var tenantIdText = subData.TenantId?.ToString();
             var result = AuthenticationResult.Successful(
                 accessToken: "*** (hidden for security)",
                 subscriptionId: subscriptionId,
                 tenantId: tenantIdText != null ? Guid.Parse(tenantIdText) : null,
-                accountName: subscription.Data.DisplayName,
+                accountName: subData.DisplayName,
                 expiresOn: DateTime.UtcNow.AddHours(1)
             );
 
@@ -119,24 +135,24 @@ public class AuthenticationService : IAuthenticationService
                 _cachedResult = result;
             }
 
-            _logger.LogInformation("Successfully authenticated with Azure CLI for subscription: {SubscriptionName} ({SubscriptionId})",
-                subscription.Data.DisplayName, subscriptionId);
+            _logger.LogInformation("Successfully authenticated for subscription: {SubscriptionName} ({SubscriptionId})",
+                subData.DisplayName, subscriptionId);
 
             return result;
         }
-        catch (Azure.RequestFailedException ex) when (ex.Status == 401 || ex.Status == 403)
+        catch (RequestFailedException ex) when (ex.Status == 401 || ex.Status == 403)
         {
             var errorMsg = $"Access denied to subscription {subscriptionId}. Please run 'az login' and ensure you have access to this subscription";
             _logger.LogError(ex, "Authentication failed for subscription {SubscriptionId}: {Error}", subscriptionId, errorMsg);
             return AuthenticationResult.Failed(errorMsg);
         }
-        catch (Azure.RequestFailedException ex) when (ex.Status == 404)
+        catch (RequestFailedException ex) when (ex.Status == 404)
         {
             var errorMsg = $"Subscription {subscriptionId} not found or not accessible";
             _logger.LogError(ex, "Subscription not found {SubscriptionId}: {Error}", subscriptionId, errorMsg);
             return AuthenticationResult.Failed(errorMsg);
         }
-        catch (Azure.Identity.CredentialUnavailableException ex)
+        catch (CredentialUnavailableException ex)
         {
             var errorMsg = "Azure CLI is not authenticated. Please run 'az login' to authenticate";
             _logger.LogError(ex, "Credential unavailable for subscription {SubscriptionId}: {Error}", subscriptionId, errorMsg);
@@ -188,14 +204,31 @@ public class AuthenticationService : IAuthenticationService
     {
         _logger.LogDebug("Getting current authentication information");
 
+        AuthenticationResult? cached;
         lock (_lock)
         {
-            if (_cachedResult?.Success == true &&
-                _cachedResult.ExpiresOn.HasValue &&
-                _cachedResult.ExpiresOn.Value > DateTime.UtcNow.AddMinutes(5))
+            cached = _cachedResult;
+        }
+
+        // If we have a cached result, ensure it still matches the Azure CLI current default subscription.
+        if (cached?.Success == true && cached.ExpiresOn.HasValue && cached.ExpiresOn.Value > DateTime.UtcNow.AddMinutes(5))
+        {
+            try
             {
-                _logger.LogDebug("Returning cached authentication result");
-                return _cachedResult;
+                var cliDefault = await TryGetCliDefaultSubscriptionIdAsync(cancellationToken);
+                if (cliDefault.HasValue && cliDefault.Value != Guid.Empty && cached.SubscriptionId != cliDefault.Value)
+                {
+                    _logger.LogInformation("CLI default subscription changed from {Old} to {New}; refreshing authentication", cached.SubscriptionId, cliDefault);
+                }
+                else
+                {
+                    _logger.LogDebug("Returning cached authentication result (matches CLI default)");
+                    return cached;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Failed to check CLI default subscription; proceeding to refresh auth");
             }
         }
 
@@ -240,11 +273,20 @@ public class AuthenticationService : IAuthenticationService
                 }
             }
 
-            // Try to determine which is the default subscription
+            // Determine default subscription using Azure CLI default for accuracy
             try
             {
-                var defaultSubscription = await armClient.GetDefaultSubscriptionAsync(cancellationToken);
-                var defaultId = defaultSubscription.Id.SubscriptionId != null ? Guid.Parse(defaultSubscription.Id.SubscriptionId) : Guid.Empty;
+                var cliDefault = await TryGetCliDefaultSubscriptionIdAsync(cancellationToken);
+                Guid defaultId;
+                if (cliDefault.HasValue && cliDefault.Value != Guid.Empty)
+                {
+                    defaultId = cliDefault.Value;
+                }
+                else
+                {
+                    var defaultSubscription = await armClient.GetDefaultSubscriptionAsync(cancellationToken);
+                    defaultId = defaultSubscription.Id.SubscriptionId != null ? Guid.Parse(defaultSubscription.Id.SubscriptionId) : Guid.Empty;
+                }
 
                 for (int i = 0; i < subscriptions.Count; i++)
                 {
@@ -263,7 +305,7 @@ public class AuthenticationService : IAuthenticationService
             _logger.LogInformation("Found {Count} available subscriptions", subscriptions.Count);
             return subscriptions;
         }
-        catch (Azure.Identity.CredentialUnavailableException ex)
+        catch (CredentialUnavailableException ex)
         {
             _logger.LogError(ex, "Azure CLI credentials unavailable when getting subscriptions");
             throw new UnauthorizedAccessException("Not authenticated with Azure CLI. Please run 'az login'", ex);
@@ -317,12 +359,12 @@ public class AuthenticationService : IAuthenticationService
 
             return storageAccounts;
         }
-        catch (Azure.RequestFailedException ex) when (ex.Status == 404)
+        catch (RequestFailedException ex) when (ex.Status == 404)
         {
             _logger.LogError(ex, "Subscription {SubscriptionId} not found", subscriptionId);
             throw new UnauthorizedAccessException($"Subscription {subscriptionId} not found or not accessible", ex);
         }
-        catch (Azure.RequestFailedException ex) when (ex.Status == 403)
+        catch (RequestFailedException ex) when (ex.Status == 403)
         {
             _logger.LogError(ex, "Access denied to subscription {SubscriptionId}", subscriptionId);
             throw new UnauthorizedAccessException($"Access denied to subscription {subscriptionId}", ex);
@@ -514,6 +556,52 @@ public class AuthenticationService : IAuthenticationService
         }
 
         return _armClient;
+    }
+
+    /// <summary>
+    /// Attempts to read the current Azure CLI default subscription id (`az account show`).
+    /// Returns null if unable to determine or CLI is unavailable/unauthenticated.
+    /// </summary>
+    private async Task<Guid?> TryGetCliDefaultSubscriptionIdAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "az",
+                Arguments = "account show --query id -o tsv",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+
+            using var process = Process.Start(startInfo);
+            if (process == null)
+            {
+                return null;
+            }
+
+            var output = await process.StandardOutput.ReadToEndAsync(cancellationToken);
+            await process.WaitForExitAsync(cancellationToken);
+
+            if (process.ExitCode != 0)
+            {
+                return null;
+            }
+
+            var text = (output ?? string.Empty).Trim();
+            if (Guid.TryParse(text, out var id))
+            {
+                return id;
+            }
+        }
+        catch
+        {
+            // Swallow and return null; caller will fallback
+        }
+
+        return null;
     }
 
     /// <summary>

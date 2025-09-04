@@ -23,6 +23,8 @@ public class ReplEngine : IReplEngine
     private string _commandBuffer = string.Empty;
     private bool _isInitialized = false;
     private bool _shouldExit = false;
+    private string? _lastMessage;
+    private bool _lastMessageIsError;
 
     public ReplEngine(IOptions<AzStoreSettings> settings, ILogger<ReplEngine> logger, ICommandRegistry commandRegistry, ISessionManager sessionManager, INavigationEngine navigationEngine, IThemeService themeService)
     {
@@ -88,10 +90,8 @@ public class ReplEngine : IReplEngine
 
                 if (!string.IsNullOrWhiteSpace(result.Message))
                 {
-                    if (result.Success)
-                        WriteInfo(result.Message);
-                    else
-                        WriteError(result.Message);
+                    _lastMessage = result.Message.TrimEnd();
+                    _lastMessageIsError = !result.Success;
                 }
 
                 await RefreshNavigationIfNeededAsync(cancellationToken);
@@ -152,32 +152,40 @@ public class ReplEngine : IReplEngine
             WriteInfo("No active session - use ':session create' or ':session switch' to begin browsing");
         }
 
+        // Render any pending command/message output below the view
+        if (!string.IsNullOrWhiteSpace(_lastMessage))
+        {
+            Console.WriteLine();
+            if (_lastMessageIsError)
+                WriteErrorLine(_lastMessage);
+            else
+                WriteInfo(_lastMessage);
+        }
+
         RenderPrompt();
     }
 
     private void RenderPrompt()
     {
-        string prompt;
-
-        if (_currentMode == ReplMode.Command)
+        // Always show the base prompt (either session breadcrumb or azstore>)
+        string basePrompt;
+        var activeSession = _sessionManager.GetActiveSession();
+        if (activeSession != null && _navigationEngine.CurrentState != null)
         {
-            prompt = $":{_commandBuffer}";
+            var breadcrumb = _navigationEngine.GetBreadcrumbPath();
+            basePrompt = $"{activeSession.Name} @ {breadcrumb}> ";
         }
         else
         {
-            var activeSession = _sessionManager.GetActiveSession();
-            if (activeSession != null && _navigationEngine.CurrentState != null)
-            {
-                var breadcrumb = _navigationEngine.GetBreadcrumbPath();
-                prompt = $"{activeSession.Name} @ {breadcrumb}> ";
-            }
-            else
-            {
-                prompt = "azstore> ";
-            }
+            basePrompt = "azstore> ";
         }
 
-        WritePrompt(prompt);
+        // In command mode, show ":{buffer}" immediately to the right of the base prompt.
+        var fullPrompt = _currentMode == ReplMode.Command
+            ? basePrompt + ":" + _commandBuffer
+            : basePrompt;
+
+        WritePrompt(fullPrompt);
     }
 
     private async Task ProcessInteractionAsync(CancellationToken cancellationToken)
@@ -204,17 +212,30 @@ public class ReplEngine : IReplEngine
                 break;
 
             case ConsoleKey.Enter:
-                if (!string.IsNullOrWhiteSpace(_commandBuffer))
+                try
                 {
-                    var shouldExit = await ProcessInputAsync($":{_commandBuffer}", cancellationToken);
-                    if (shouldExit)
+                    if (!string.IsNullOrWhiteSpace(_commandBuffer))
                     {
-                        _shouldExit = true;
-                        return;
+                        // Ensure any subsequent output starts on the next line, not inline with the prompt
+                        Console.WriteLine();
+                        var shouldExit = await ProcessInputAsync($":{_commandBuffer}", cancellationToken);
+                        if (shouldExit)
+                        {
+                            _shouldExit = true;
+                            return;
+                        }
                     }
                 }
-                _currentMode = ReplMode.Navigation;
-                _commandBuffer = string.Empty;
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error executing command: :{Command}", _commandBuffer);
+                    WriteError($"Command failed: {ex.Message}");
+                }
+                finally
+                {
+                    _currentMode = ReplMode.Navigation;
+                    _commandBuffer = string.Empty;
+                }
                 break;
 
             case ConsoleKey.Backspace:
@@ -311,6 +332,9 @@ public class ReplEngine : IReplEngine
     }
 
     public void WriteError(string message) => _themeService.Write(message, Theming.ThemeToken.Error);
+    
+    // Overload to write errors with newline when used in RenderCurrentState
+    private void WriteErrorLine(string message) => _themeService.WriteLine(message, Theming.ThemeToken.Error);
 
     public void WriteColored(string message, string colorName)
     {
