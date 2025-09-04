@@ -4,6 +4,7 @@ using AzStore.Core.Models.Storage;
 using AzStore.Terminal.Input;
 using AzStore.Terminal.Navigation;
 using AzStore.Terminal.UI;
+using AzStore.Terminal.Theming;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using Xunit;
@@ -19,8 +20,9 @@ public class BlobBrowserViewTests
         var logger = Substitute.For<ILogger<BlobBrowserView>>();
         var keyBindings = new KeyBindings();
         var inputHandler = Substitute.For<IInputHandler>();
+        var theme = Substitute.For<IThemeService>();
 
-        var view = new BlobBrowserView(logger, keyBindings, inputHandler);
+        var view = new BlobBrowserView(logger, keyBindings, inputHandler, theme);
 
         Assert.NotNull(view);
     }
@@ -31,7 +33,8 @@ public class BlobBrowserViewTests
         var logger = Substitute.For<ILogger<BlobBrowserView>>();
         var keyBindings = new KeyBindings();
         var inputHandler = Substitute.For<IInputHandler>();
-        var view = new BlobBrowserView(logger, keyBindings, inputHandler);
+        var theme = Substitute.For<IThemeService>();
+        var view = new BlobBrowserView(logger, keyBindings, inputHandler, theme);
 
         var containers = new List<StorageItem>
         {
@@ -53,7 +56,8 @@ public class BlobBrowserViewTests
         var logger = Substitute.For<ILogger<BlobBrowserView>>();
         var keyBindings = new KeyBindings();
         var inputHandler = Substitute.For<IInputHandler>();
-        var view = new BlobBrowserView(logger, keyBindings, inputHandler);
+        var theme = Substitute.For<IThemeService>();
+        var view = new BlobBrowserView(logger, keyBindings, inputHandler, theme);
 
         var blobs = new List<StorageItem>
         {
@@ -176,8 +180,9 @@ public class BlobBrowserViewTests
             KeySequenceTimeout = 500
         };
         var inputHandler = Substitute.For<IInputHandler>();
+        var theme = Substitute.For<IThemeService>();
 
-        var view = new BlobBrowserView(logger, keyBindings, inputHandler);
+        var view = new BlobBrowserView(logger, keyBindings, inputHandler, theme);
 
         // Test passes if no exception is thrown during instantiation
         Assert.NotNull(view);
@@ -189,7 +194,8 @@ public class BlobBrowserViewTests
         var logger = Substitute.For<ILogger<BlobBrowserView>>();
         var keyBindings = new KeyBindings();
         var inputHandler = Substitute.For<IInputHandler>();
-        var view = new BlobBrowserView(logger, keyBindings, inputHandler);
+        var theme = Substitute.For<IThemeService>();
+        var view = new BlobBrowserView(logger, keyBindings, inputHandler, theme);
 
         bool eventFired = false;
         NavigationResult? receivedResult = null;

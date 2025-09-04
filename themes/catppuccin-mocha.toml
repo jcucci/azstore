@@ -1,0 +1,15 @@
+# Catppuccin Mocha (dark) — ConsoleColor approximations
+# Reference: https://github.com/catppuccin/catppuccin
+
+[AzStore.theme]
+prompt_color = "Cyan"           # sky / sapphire
+status_message_color = "Green"  # teal leaning
+error_color = "Red"
+selection_color = "Yellow"
+breadcrumb_color = "DarkGray"
+container_color = "Blue"
+blob_color = "White"
+title_color = "White"
+pager_info_color = "DarkGray"
+input_color = "White"
+

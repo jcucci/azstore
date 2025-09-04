@@ -5,12 +5,13 @@ using AzStore.Terminal.Navigation;
 using AzStore.Terminal.Commands;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using AzStore.Terminal.Theming;
 
 namespace AzStore.Terminal.Repl;
 
 public class ReplEngine : IReplEngine
 {
-    private readonly ThemeSettings _theme;
+    private readonly IThemeService _themeService;
     private readonly KeyBindings _keyBindings;
     private readonly ILogger<ReplEngine> _logger;
     private readonly ICommandRegistry _commandRegistry;
@@ -23,10 +24,10 @@ public class ReplEngine : IReplEngine
     private bool _isInitialized = false;
     private bool _shouldExit = false;
 
-    public ReplEngine(IOptions<AzStoreSettings> settings, ILogger<ReplEngine> logger, ICommandRegistry commandRegistry, ISessionManager sessionManager, INavigationEngine navigationEngine)
+    public ReplEngine(IOptions<AzStoreSettings> settings, ILogger<ReplEngine> logger, ICommandRegistry commandRegistry, ISessionManager sessionManager, INavigationEngine navigationEngine, IThemeService themeService)
     {
         var settingsValue = settings.Value;
-        _theme = settingsValue.Theme;
+        _themeService = themeService;
         _keyBindings = settingsValue.KeyBindings;
         _logger = logger;
         _commandRegistry = commandRegistry;
@@ -300,25 +301,16 @@ public class ReplEngine : IReplEngine
         return parsed.Arguments;
     }
 
-    public void WritePrompt(string message)
-    {
-        WriteColored(message, _theme.PromptColor);
-    }
+    public void WritePrompt(string message) => _themeService.Write(message, Theming.ThemeToken.Prompt);
 
-    public void WriteStatus(string message)
-    {
-        WriteColored(message, _theme.StatusMessageColor);
-    }
+    public void WriteStatus(string message) => _themeService.Write(message, Theming.ThemeToken.Status);
 
     public void WriteInfo(string message)
     {
         Console.WriteLine(message);
     }
 
-    public void WriteError(string message)
-    {
-        WriteColored(message, nameof(ConsoleColor.Red));
-    }
+    public void WriteError(string message) => _themeService.Write(message, Theming.ThemeToken.Error);
 
     public void WriteColored(string message, string colorName)
     {

@@ -14,7 +14,8 @@ public static class TerminalPager
     /// </summary>
     /// <param name="title">Optional title displayed at the top.</param>
     /// <param name="content">The content to display.</param>
-    public static void Show(string? title, string content)
+    /// <param name="theme">Optional theme service for colored title and status line.</param>
+    public static void Show(string? title, string content, AzStore.Terminal.Theming.IThemeService? theme = null)
     {
         var lines = SplitLines(content);
         var top = 0;
@@ -37,7 +38,9 @@ public static class TerminalPager
             // Title
             if (!string.IsNullOrWhiteSpace(title))
             {
-                Console.WriteLine(Truncate(title, width));
+                var text = Truncate(title, width);
+                if (theme != null) theme.WriteLine(text, AzStore.Terminal.Theming.ThemeToken.Title);
+                else Console.WriteLine(text);
             }
             else
             {
@@ -65,7 +68,9 @@ public static class TerminalPager
             var statusLeft = StatusHint;
             var statusRight = rangeInfo;
             var pad = Math.Max(0, width - statusLeft.Length - statusRight.Length - 1);
-            Console.WriteLine(Truncate(statusLeft + new string(' ', pad) + statusRight, width));
+            var status = Truncate(statusLeft + new string(' ', pad) + statusRight, width);
+            if (theme != null) theme.WriteLine(status, AzStore.Terminal.Theming.ThemeToken.PagerInfo);
+            else Console.WriteLine(status);
 
             var key = Console.ReadKey(true);
 
@@ -105,7 +110,7 @@ public static class TerminalPager
                     }
                     if (key.KeyChar == '/')
                     {
-                        lastSearch = ReadLineWithPrompt("/", width - 1);
+                        lastSearch = ReadLineWithPrompt("/", width - 1, theme);
                         if (!string.IsNullOrEmpty(lastSearch))
                         {
                             lastMatchLine = FindMatch(lines, lastSearch, startFrom: top + 1);
@@ -159,9 +164,9 @@ public static class TerminalPager
         return null;
     }
 
-    private static string ReadLineWithPrompt(string prompt, int maxWidth)
+    private static string ReadLineWithPrompt(string prompt, int maxWidth, AzStore.Terminal.Theming.IThemeService? theme = null)
     {
-        Console.Write(prompt);
+        if (theme != null) theme.Write(prompt, AzStore.Terminal.Theming.ThemeToken.Input); else Console.Write(prompt);
         var buffer = new List<char>();
         while (true)
         {

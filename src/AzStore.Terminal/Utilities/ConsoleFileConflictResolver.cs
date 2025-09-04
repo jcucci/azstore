@@ -4,6 +4,7 @@ using AzStore.Core.Services.Abstractions;
 using AzStore.Terminal.UI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using AzStore.Terminal.Theming;
 
 namespace AzStore.Terminal.Utilities;
 
@@ -12,14 +13,16 @@ public sealed class ConsoleFileConflictResolver : IFileConflictResolver
     private readonly ILogger<ConsoleFileConflictResolver> _logger;
     private readonly ISessionManager _sessionManager;
     private readonly IOptions<AzStoreSettings> _settings;
+    private readonly IThemeService _theme;
 
     private readonly Dictionary<string, ConflictResolution> _userSessionPreference = [];
 
-    public ConsoleFileConflictResolver(ILogger<ConsoleFileConflictResolver> logger, ISessionManager sessionManager, IOptions<AzStoreSettings> settings)
+    public ConsoleFileConflictResolver(ILogger<ConsoleFileConflictResolver> logger, ISessionManager sessionManager, IOptions<AzStoreSettings> settings, IThemeService theme)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _sessionManager = sessionManager ?? throw new ArgumentNullException(nameof(sessionManager));
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+        _theme = theme ?? throw new ArgumentNullException(nameof(theme));
     }
 
     public async Task<FileConflictDecision> ResolveAsync(string desiredPath, ConflictResolution mode, FileConflictInfo info, CancellationToken cancellationToken = default)
@@ -68,7 +71,8 @@ public sealed class ConsoleFileConflictResolver : IFileConflictResolver
             remoteChecksum: info.RemoteChecksumMd5,
             showSize: _settings.Value.CompareSizeOnConflict,
             showDate: _settings.Value.CompareLastModifiedOnConflict,
-            showChecksum: _settings.Value.CompareChecksumOnConflict);
+            showChecksum: _settings.Value.CompareChecksumOnConflict,
+            theme: _theme);
 
         if (!string.IsNullOrEmpty(sessionName) && result.RememberForSession)
         {
@@ -120,4 +124,3 @@ public sealed class ConsoleFileConflictResolver : IFileConflictResolver
         return newPath;
     }
 }
-

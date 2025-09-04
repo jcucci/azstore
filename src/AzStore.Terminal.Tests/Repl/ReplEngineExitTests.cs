@@ -3,6 +3,7 @@ using AzStore.Core.Services.Abstractions;
 using AzStore.Terminal.Commands;
 using AzStore.Terminal.Navigation;
 using AzStore.Terminal.Repl;
+using AzStore.Terminal.Theming;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -28,6 +29,7 @@ public class ReplEngineExitTests
         var logger = Substitute.For<ILogger<ReplEngine>>();
         var sessionManager = Substitute.For<ISessionManager>();
         var navigationEngine = Substitute.For<INavigationEngine>();
+        var theme = Substitute.For<IThemeService>();
 
         var exitCmd = Substitute.For<ICommand>();
         exitCmd.Name.Returns("exit");
@@ -39,7 +41,7 @@ public class ReplEngineExitTests
         var registry = Substitute.For<ICommandRegistry>();
         registry.FindCommand("exit").Returns(exitCmd);
 
-        var repl = new ReplEngine(settings, logger, registry, sessionManager, navigationEngine);
+        var repl = new ReplEngine(settings, logger, registry, sessionManager, navigationEngine, theme);
 
         var shouldExit = await repl.ProcessInputAsync(":exit");
 
@@ -54,6 +56,7 @@ public class ReplEngineExitTests
         var logger = Substitute.For<ILogger<ReplEngine>>();
         var sessionManager = Substitute.For<ISessionManager>();
         var navigationEngine = Substitute.For<INavigationEngine>();
+        var theme = Substitute.For<IThemeService>();
 
         string[]? capturedArgs = null;
         var exitCmd = Substitute.For<ICommand>();
@@ -72,7 +75,7 @@ public class ReplEngineExitTests
         registry.FindCommand("q").Returns(exitCmd); // alias lookup
         registry.FindCommand(":exit").Returns((ICommand?)null); // ensure lookup uses parsed name
 
-        var repl = new ReplEngine(settings, logger, registry, sessionManager, navigationEngine);
+        var repl = new ReplEngine(settings, logger, registry, sessionManager, navigationEngine, theme);
 
         var shouldExit = await repl.ProcessInputAsync(":q!");
 

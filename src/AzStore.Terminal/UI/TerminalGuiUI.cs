@@ -7,6 +7,7 @@ using AzStore.Terminal.Navigation;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Terminal.Gui;
+using AzStore.Terminal.Theming;
 
 namespace AzStore.Terminal.UI;
 
@@ -16,15 +17,17 @@ public class TerminalGuiUI : ITerminalUI
     private readonly ILoggerFactory _loggerFactory;
     private readonly BlobBrowserView _browserView;
     private bool _isRunning;
+    private readonly IThemeService _theme;
     private TaskCompletionSource<NavigationResult>? _currentNavigationTask;
 
-    public TerminalGuiUI(ILogger<TerminalGuiUI> logger, ILoggerFactory loggerFactory, IOptions<AzStoreSettings> settings, IInputHandler inputHandler)
+    public TerminalGuiUI(ILogger<TerminalGuiUI> logger, ILoggerFactory loggerFactory, IOptions<AzStoreSettings> settings, IInputHandler inputHandler, IThemeService theme)
     {
         _logger = logger;
         _loggerFactory = loggerFactory;
+        _theme = theme;
 
         var browserLogger = _loggerFactory.CreateLogger<BlobBrowserView>();
-        _browserView = new BlobBrowserView(browserLogger, settings.Value.KeyBindings, inputHandler);
+        _browserView = new BlobBrowserView(browserLogger, settings.Value.KeyBindings, inputHandler, theme);
         _browserView.NavigationRequested += OnNavigationRequested;
     }
 
@@ -48,6 +51,9 @@ public class TerminalGuiUI : ITerminalUI
             {
                 Title = "AzStore - Azure Blob Storage Terminal"
             };
+
+            // Apply basic theming
+            win.ColorScheme = _theme.GetLabelColorScheme(ThemeToken.Title);
 
             _browserView.X = 0;
             _browserView.Y = 0;

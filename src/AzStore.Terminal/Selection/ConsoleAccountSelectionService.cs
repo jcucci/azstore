@@ -4,6 +4,7 @@ using AzStore.Terminal.Input;
 using AzStore.Terminal.Utilities;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using AzStore.Terminal.Theming;
 
 namespace AzStore.Terminal.Selection;
 
@@ -13,23 +14,26 @@ public class ConsoleAccountSelectionService : IAccountSelectionService
     private readonly KeyBindings _keyBindings;
     private readonly TerminalSelectionOptions _options;
     private readonly IFuzzyMatcher _matcher;
+    private readonly IThemeService _theme;
 
     public ConsoleAccountSelectionService(
         ILogger<ConsoleAccountSelectionService> logger,
         IOptions<AzStoreSettings> settings,
-        IFuzzyMatcher matcher)
+        IFuzzyMatcher matcher,
+        IThemeService theme)
     {
         _logger = logger;
         _keyBindings = settings.Value.KeyBindings;
         _options = settings.Value.Selection;
         _matcher = matcher;
+        _theme = theme;
     }
 
     public async Task<StorageAccountInfo?> PickAsync(IReadOnlyList<StorageAccountInfo> accounts, CancellationToken cancellationToken = default)
     {
         if (accounts.Count == 0)
         {
-            WriteError("No storage accounts found.");
+            _theme.WriteLine("No storage accounts found.", ThemeToken.Error);
             return null;
         }
 
@@ -53,7 +57,7 @@ public class ConsoleAccountSelectionService : IAccountSelectionService
             if (_options.PickerTimeoutMs.HasValue && lastInputTime.HasValue && (DateTime.UtcNow - lastInputTime.Value).TotalMilliseconds > _options.PickerTimeoutMs.Value)
             {
                 _logger.LogInformation("Account picker timed out after {Ms} ms", _options.PickerTimeoutMs);
-                WriteInfo("Selection cancelled (timeout)");
+                Console.WriteLine("Selection cancelled (timeout)");
                 return null;
             }
 
@@ -72,7 +76,7 @@ public class ConsoleAccountSelectionService : IAccountSelectionService
             {
                 _logger.LogInformation("User cancelled account selection");
                 ClearOverlay(maxVisible + 5);
-                WriteInfo("Selection cancelled");
+                Console.WriteLine("Selection cancelled");
                 return null;
             }
 
@@ -172,7 +176,7 @@ public class ConsoleAccountSelectionService : IAccountSelectionService
                     Console.Write(prefix);
                     Console.Write(before);
                     var c = Console.ForegroundColor;
-                    Console.ForegroundColor = ConsoleColor.Cyan;
+                    Console.ForegroundColor = _theme.ResolveForeground(ThemeToken.Status);
                     Console.Write(match);
                     Console.ForegroundColor = c;
                     Console.WriteLine(after);
@@ -212,11 +216,4 @@ public class ConsoleAccountSelectionService : IAccountSelectionService
     }
 
     private static void WriteInfo(string message) => Console.WriteLine(message);
-    private static void WriteError(string message)
-    {
-        var c = Console.ForegroundColor;
-        Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine(message);
-        Console.ForegroundColor = c;
-    }
 }

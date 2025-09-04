@@ -23,6 +23,29 @@ public class ThemeSettings
     [ValidConsoleColor]
     public string StatusMessageColor { get; set; } = nameof(ConsoleColor.Cyan);
 
+    [Required]
+    [ValidConsoleColor]
+    public string ErrorColor { get; set; } = nameof(ConsoleColor.Red);
+
+    // Extended palette for richer theming (Phase 5)
+    [ValidConsoleColor]
+    public string BreadcrumbColor { get; set; } = nameof(ConsoleColor.Gray);
+
+    [ValidConsoleColor]
+    public string ContainerColor { get; set; } = nameof(ConsoleColor.Blue);
+
+    [ValidConsoleColor]
+    public string BlobColor { get; set; } = nameof(ConsoleColor.White);
+
+    [ValidConsoleColor]
+    public string TitleColor { get; set; } = nameof(ConsoleColor.White);
+
+    [ValidConsoleColor]
+    public string PagerInfoColor { get; set; } = nameof(ConsoleColor.DarkGray);
+
+    [ValidConsoleColor]
+    public string InputColor { get; set; } = nameof(ConsoleColor.White);
+
     public static bool IsValidColor(string colorName)
     {
         return ValidColors.Contains(colorName, StringComparer.OrdinalIgnoreCase) ||

@@ -3,6 +3,7 @@ using AzStore.Core.Models.Navigation;
 using AzStore.Core.Models.Storage;
 using AzStore.Terminal.Input;
 using AzStore.Terminal.UI;
+using AzStore.Terminal.Theming;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using System.Diagnostics;
@@ -19,7 +20,8 @@ public class PerformanceTests
         var logger = Substitute.For<ILogger<BlobBrowserView>>();
         var keyBindings = new KeyBindings();
         var inputHandler = Substitute.For<IInputHandler>();
-        var view = new BlobBrowserView(logger, keyBindings, inputHandler);
+        var theme = Substitute.For<IThemeService>();
+        var view = new BlobBrowserView(logger, keyBindings, inputHandler, theme);
 
         var items = GenerateLargeItemList(1000);
         var navigationState = NavigationState.CreateInContainer("test-session", "storage-account", "container");
@@ -41,7 +43,8 @@ public class PerformanceTests
         var logger = Substitute.For<ILogger<BlobBrowserView>>();
         var keyBindings = new KeyBindings();
         var inputHandler = Substitute.For<IInputHandler>();
-        var view = new BlobBrowserView(logger, keyBindings, inputHandler);
+        var theme = Substitute.For<IThemeService>();
+        var view = new BlobBrowserView(logger, keyBindings, inputHandler, theme);
 
         var items = GenerateLargeItemList(5000);
         var navigationState = NavigationState.CreateInContainer("test-session", "storage-account", "container");
@@ -101,7 +104,8 @@ public class PerformanceTests
         var logger = Substitute.For<ILogger<BlobBrowserView>>();
         var keyBindings = new KeyBindings();
         var inputHandler = Substitute.For<IInputHandler>();
-        var view = new BlobBrowserView(logger, keyBindings, inputHandler);
+        var theme = Substitute.For<IThemeService>();
+        var view = new BlobBrowserView(logger, keyBindings, inputHandler, theme);
 
         var beforeMemory = GC.GetTotalMemory(true);
 
@@ -124,7 +128,8 @@ public class PerformanceTests
         var logger = Substitute.For<ILogger<BlobBrowserView>>();
         var keyBindings = new KeyBindings();
         var inputHandler = Substitute.For<IInputHandler>();
-        var view = new BlobBrowserView(logger, keyBindings, inputHandler);
+        var theme = Substitute.For<IThemeService>();
+        var view = new BlobBrowserView(logger, keyBindings, inputHandler, theme);
 
         var items = GenerateLargeItemList(500);
         var navigationState = NavigationState.CreateInContainer("test-session", "storage-account", "container");
