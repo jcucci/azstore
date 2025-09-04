@@ -98,7 +98,7 @@ public class ThemeService : IThemeService
         ConsoleColor.DarkMagenta => Tui.Color.Magenta,
         ConsoleColor.DarkYellow => Tui.Color.Yellow,
         ConsoleColor.Gray => Tui.Color.Gray,
-        ConsoleColor.DarkGray => Tui.Color.Gray,
+        ConsoleColor.DarkGray => Tui.Color.DarkGray,
         ConsoleColor.Blue => Tui.Color.Blue,
         ConsoleColor.Green => Tui.Color.Green,
         ConsoleColor.Cyan => Tui.Color.Cyan,

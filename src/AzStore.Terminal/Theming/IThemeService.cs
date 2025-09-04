@@ -1,6 +1,4 @@
 using System;
-using AzStore.Configuration;
-using Microsoft.Extensions.Options;
 
 namespace AzStore.Terminal.Theming;
 

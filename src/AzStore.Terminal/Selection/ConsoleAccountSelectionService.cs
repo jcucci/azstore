@@ -215,5 +215,5 @@ public class ConsoleAccountSelectionService : IAccountSelectionService
         return width <= 1 ? s[..width] : s[..(width - 1)] + "\u2026"; // ellipsis
     }
 
-    private static void WriteInfo(string message) => Console.WriteLine(message);
+    
 }

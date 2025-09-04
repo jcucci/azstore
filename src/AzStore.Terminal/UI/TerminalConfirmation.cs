@@ -86,7 +86,7 @@ public class TerminalConfirmation
     {
         var fileName = Path.GetFileName(filePath);
         var message = $"'{fileName}' already exists. Overwrite?";
-        return ShowConfirmation(message, 'N', theme); // Default to No for destructive operations
+        return ShowConfirmation(message, defaultChoice: 'N', theme: theme); // Default to No for destructive operations
     }
 
     /// <summary>
@@ -158,7 +158,7 @@ public class TerminalConfirmation
         };
 
         var message = $"'{fileName}' already exists.";
-        return ShowCustomConfirmation(message, options, 'S', theme); // Default to Skip
+        return ShowCustomConfirmation(message, options, defaultKey: 'S', theme: theme); // Default to Skip
     }
 
     /// <summary>
