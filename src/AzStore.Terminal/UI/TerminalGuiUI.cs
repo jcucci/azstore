@@ -34,6 +34,13 @@ public class TerminalGuiUI : ITerminalUI
     private void OnNavigationRequested(object? sender, NavigationResult result)
     {
         _logger.LogDebug("Navigation requested: {Action}", result.Action);
+
+        if (result.Action == NavigationAction.Cancel)
+        {
+            try { Application.RequestStop(); } catch { }
+            return;
+        }
+
         _currentNavigationTask?.TrySetResult(result);
     }
 
@@ -46,14 +53,27 @@ public class TerminalGuiUI : ITerminalUI
             Application.Init();
             _isRunning = true;
 
-            var top = new Toplevel();
-            var win = new Window()
-            {
-                Title = "AzStore - Azure Blob Storage Terminal"
-            };
+            var baseScheme = _theme.GetLabelColorScheme(ThemeToken.Background);
 
-            // Apply basic theming
-            win.ColorScheme = _theme.GetLabelColorScheme(ThemeToken.Title);
+            // Apply global color schemes to ensure a black background across the app
+            // Note: Terminal.Gui v2 may not expose global Colors; we rely on per-view schemes
+
+            if (Application.Top != null)
+            {
+                Application.Top.ColorScheme = baseScheme;
+            }
+
+            var top = new Toplevel { ColorScheme = baseScheme };
+
+            var win = new Window
+            {
+                X = 0,
+                Y = 0,
+                Width = Dim.Fill(),
+                Height = Dim.Fill(),
+                Title = string.Empty,
+                ColorScheme = baseScheme
+            };
 
             _browserView.X = 0;
             _browserView.Y = 0;

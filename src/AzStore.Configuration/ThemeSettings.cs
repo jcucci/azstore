@@ -46,6 +46,9 @@ public class ThemeSettings
     [ValidConsoleColor]
     public string InputColor { get; set; } = nameof(ConsoleColor.White);
 
+    [ValidConsoleColor]
+    public string BackgroundColor { get; set; } = nameof(ConsoleColor.Black);
+
     public static bool IsValidColor(string colorName)
     {
         return ValidColors.Contains(colorName, StringComparer.OrdinalIgnoreCase) ||

@@ -2,6 +2,7 @@ namespace AzStore.Terminal.Theming;
 
 public enum ThemeToken
 {
+    Background,
     Prompt,
     Status,
     Error,
@@ -13,4 +14,3 @@ public enum ThemeToken
     PagerInfo,
     Input
 }
-
