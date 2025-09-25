@@ -37,7 +37,15 @@ public class TerminalGuiUI : ITerminalUI
 
         if (result.Action == NavigationAction.Cancel)
         {
-            try { Application.RequestStop(); } catch { }
+            try
+            {
+                Application.RequestStop();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to stop Terminal.Gui application during cancel navigation");
+            }
+
             return;
         }
 

@@ -35,13 +35,20 @@ public sealed class TuiHostedService : BackgroundService
         }
         finally
         {
-            try { _ui.Shutdown(); } catch { }
+            TryShutdown();
             _lifetime.StopApplication();
         }
     }
 
     private void TryShutdown()
     {
-        try { _ui.Shutdown(); } catch { }
+        try
+        {
+            _ui.Shutdown();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to shutdown Terminal UI");
+        }
     }
 }
