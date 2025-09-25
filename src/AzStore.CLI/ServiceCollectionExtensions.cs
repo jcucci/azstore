@@ -65,7 +65,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<ICommand, SessionCommand>();
         services.AddSingleton<ICommandRegistry, CommandRegistry>();
 
-        services.AddHostedService<ReplHostedService>();
+        services.AddHostedService<TuiHostedService>();
 
         return services;
     }

@@ -18,6 +18,7 @@ public class ThemeService : IThemeService
         var theme = _settings.CurrentValue.Theme;
         var colorName = token switch
         {
+            ThemeToken.Background => theme.BackgroundColor,
             ThemeToken.Prompt => theme.PromptColor,
             ThemeToken.Status => theme.StatusMessageColor,
             ThemeToken.Error => theme.ErrorColor,
@@ -56,7 +57,7 @@ public class ThemeService : IThemeService
     {
         var fgConsole = ResolveForeground(token);
         var fg = MapConsoleToTui(fgConsole);
-        var bg = Tui.Color.Black;
+        var bg = ResolveBackground();
         return new Tui.Attribute(fg, bg);
     }
 
@@ -84,8 +85,18 @@ public class ThemeService : IThemeService
             Focus = ResolveTui(token),
             HotNormal = ResolveTui(token),
             HotFocus = ResolveTui(token),
-            Disabled = new Tui.Attribute(Tui.Color.DarkGray, Tui.Color.Black)
+            Disabled = new Tui.Attribute(Tui.Color.DarkGray, ResolveBackground())
         };
+    }
+
+    public Tui.Color ResolveBackground()
+    {
+        var theme = _settings.CurrentValue.Theme;
+        var name = string.IsNullOrWhiteSpace(theme.BackgroundColor)
+            ? nameof(ConsoleColor.Black)
+            : theme.BackgroundColor;
+
+        return MapConsoleToTui(Enum.TryParse<ConsoleColor>(name, true, out var c) ? c : ConsoleColor.Black);
     }
 
     private static Tui.Color MapConsoleToTui(ConsoleColor color) => color switch

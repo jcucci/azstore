@@ -10,4 +10,5 @@ public interface IThemeService
     global::Terminal.Gui.Attribute ResolveTui(ThemeToken token);
     global::Terminal.Gui.ColorScheme GetListColorScheme();
     global::Terminal.Gui.ColorScheme GetLabelColorScheme(ThemeToken token);
+    global::Terminal.Gui.Color ResolveBackground();
 }
