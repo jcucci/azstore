@@ -96,6 +96,10 @@ public class MyCommand : ICommand
 
 ## Development Practices
 
+### Tooling Guidance
+- **Sherlock MCP for .NET APIs**: Whenever you need to inspect types, methods, or properties from external assemblies (e.g., `Terminal.Gui`, Azure SDKs), call the Sherlock MCP server instead of guessing. Use `sherlock__analyze_type` for an overview, `sherlock__get_type_methods` / `sherlock__get_type_properties` for deeper detail, and related helpers as needed. Prefer this before writing code that depends on unfamiliar APIs or when resolving build errors caused by unknown signatures.
+- **Workflow Expectation**: Invoke Sherlock proactively when adding new integrations, adjusting focus/key handling, or encountering compiler errors that mention missing members. Document the findings in your reasoning so future agents understand why specific API members were chosen.
+
 ### Testing Strategy
 - **Test Architecture**: Fixture and Assertions pattern for clean test organization
 - **Mocking**: NSubstitute for dependency substitution

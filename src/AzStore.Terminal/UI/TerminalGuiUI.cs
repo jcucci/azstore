@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Terminal.Gui;
 using AzStore.Terminal.Theming;
+using AzStore.Terminal.UI.Layout;
 
 namespace AzStore.Terminal.UI;
 
@@ -16,6 +17,7 @@ public class TerminalGuiUI : ITerminalUI
     private readonly ILogger<TerminalGuiUI> _logger;
     private readonly ILoggerFactory _loggerFactory;
     private readonly BlobBrowserView _browserView;
+    private readonly LayoutRootView _layoutRoot;
     private bool _isRunning;
     private readonly IThemeService _theme;
     private TaskCompletionSource<NavigationResult>? _currentNavigationTask;
@@ -29,6 +31,8 @@ public class TerminalGuiUI : ITerminalUI
         var browserLogger = _loggerFactory.CreateLogger<BlobBrowserView>();
         _browserView = new BlobBrowserView(browserLogger, settings.Value.KeyBindings, inputHandler, theme);
         _browserView.NavigationRequested += OnNavigationRequested;
+
+        _layoutRoot = new LayoutRootView(_browserView, theme);
     }
 
     private void OnNavigationRequested(object? sender, NavigationResult result)
@@ -83,16 +87,16 @@ public class TerminalGuiUI : ITerminalUI
                 ColorScheme = baseScheme
             };
 
-            _browserView.X = 0;
-            _browserView.Y = 0;
-            _browserView.Width = Dim.Fill();
-            _browserView.Height = Dim.Fill();
+            _layoutRoot.X = 0;
+            _layoutRoot.Y = 0;
+            _layoutRoot.Width = Dim.Fill();
+            _layoutRoot.Height = Dim.Fill();
 
-            win.Add(_browserView);
+            win.Add(_layoutRoot);
             top.Add(win);
 
-            Application.Top?.Add(top);
-            Application.Run();
+            _layoutRoot.ScheduleInitialFocus();
+            Application.Run(top);
         }
         catch (Exception ex)
         {
