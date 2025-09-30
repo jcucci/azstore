@@ -1,5 +1,6 @@
 using System;
 using AzStore.Terminal.Theming;
+using Microsoft.Extensions.Logging;
 using Terminal.Gui;
 using Tui = global::Terminal.Gui;
 
@@ -10,13 +11,17 @@ public sealed class PaneChromeView : View
     private readonly PaneViewBase _content;
     private readonly ColorScheme _normalScheme;
     private readonly ColorScheme _focusScheme;
-    private bool _navigationSubscribed;
+    private readonly ILogger<PaneChromeView>? _logger;
 
-    public PaneChromeView(PaneViewBase content, IThemeService theme)
+    public PaneChromeView(PaneViewBase content, IThemeService theme, ILogger<PaneChromeView>? logger = null)
     {
         _content = content;
+        _logger = logger;
 
-        CanFocus = false;
+        _logger?.LogInformation("PaneChromeView created for pane: {Title}", content.Title);
+
+        CanFocus = true;
+        TabStop = TabBehavior.TabStop;
         ShadowStyle = ShadowStyle.None;
         Width = Dim.Fill();
         Height = Dim.Fill();
@@ -45,23 +50,22 @@ public sealed class PaneChromeView : View
 
         _content.TitleChanged += OnContentTitleChanged;
         _content.HasFocusChanged += OnContentHasFocusChanged;
-
-        SubscribeNavigation();
+        HasFocusChanged += OnChromeFocusChanged;
     }
 
     public PaneViewBase Content => _content;
 
-    public override void OnAdded(SuperViewChangedEventArgs e)
+    public void SetActiveState(bool isActive)
     {
-        base.OnAdded(e);
-        SubscribeNavigation();
-        UpdateChrome();
+        _logger?.LogDebug("SetActiveState for '{Title}': isActive={IsActive}", Title, isActive);
+        ApplyScheme(isActive ? _focusScheme : _normalScheme);
     }
 
-    public override void OnRemoved(SuperViewChangedEventArgs e)
+    public override void OnAdded(SuperViewChangedEventArgs e)
     {
-        base.OnRemoved(e);
-        UnsubscribeNavigation();
+        _logger?.LogInformation("PaneChromeView '{Title}' added to view hierarchy", Title);
+        base.OnAdded(e);
+        UpdateChrome();
     }
 
     protected override void Dispose(bool disposing)
@@ -70,7 +74,7 @@ public sealed class PaneChromeView : View
         {
             _content.TitleChanged -= OnContentTitleChanged;
             _content.HasFocusChanged -= OnContentHasFocusChanged;
-            UnsubscribeNavigation();
+            HasFocusChanged -= OnChromeFocusChanged;
         }
 
         base.Dispose(disposing);
@@ -82,58 +86,40 @@ public sealed class PaneChromeView : View
         SetNeedsDraw();
     }
 
-    private void OnContentHasFocusChanged(object? sender, HasFocusEventArgs e) => UpdateChrome();
-
-    private void SubscribeNavigation()
+    private void OnContentHasFocusChanged(object? sender, HasFocusEventArgs e)
     {
-        if (_navigationSubscribed)
-        {
-            return;
-        }
-
-        var navigation = Application.Navigation;
-        if (navigation is null)
-        {
-            return;
-        }
-
-        navigation.FocusedChanged += OnNavigationFocusedChanged;
-        _navigationSubscribed = true;
+        _logger?.LogDebug("PaneChromeView '{Title}': Content.HasFocusChanged event fired, NewValue={NewValue}", Title, e.NewValue);
         UpdateChrome();
     }
 
-    private void UnsubscribeNavigation()
+    private void OnChromeFocusChanged(object? sender, HasFocusEventArgs e)
     {
-        if (!_navigationSubscribed)
-        {
-            return;
-        }
-
-        var navigation = Application.Navigation;
-        if (navigation is not null)
-        {
-            navigation.FocusedChanged -= OnNavigationFocusedChanged;
-        }
-
-        _navigationSubscribed = false;
+        _logger?.LogDebug("PaneChromeView '{Title}': Chrome.HasFocusChanged event fired, NewValue={NewValue}", Title, e.NewValue);
+        UpdateChrome();
     }
-
-    private void OnNavigationFocusedChanged(object? sender, EventArgs e) => UpdateChrome();
 
     private void UpdateChrome()
     {
-        var isActive = _content.HasFocus || _content.MostFocused is not null;
+        var hasFocus = HasFocus;
+        var contentHasFocus = _content.HasFocus;
+        var mostFocused = _content.MostFocused;
+        var isActive = hasFocus || contentHasFocus || mostFocused is not null;
+
+        _logger?.LogDebug(
+            "UpdateChrome for '{Title}': HasFocus={HasFocus}, Content.HasFocus={ContentHasFocus}, Content.MostFocused={MostFocused}, IsActive={IsActive}",
+            Title, hasFocus, contentHasFocus, mostFocused?.GetType().Name ?? "null", isActive);
+
         ApplyScheme(isActive ? _focusScheme : _normalScheme);
     }
 
     private void ApplyScheme(ColorScheme scheme)
     {
-        ColorScheme = scheme;
-        if (Border is { } border)
-        {
-            border.ColorScheme = scheme;
-        }
+        var schemeName = ReferenceEquals(scheme, _focusScheme) ? "Focus" : "Normal";
+        _logger?.LogDebug(
+            "ApplyScheme for '{Title}': Applying {Scheme} scheme (Normal={Normal})",
+            Title, schemeName, scheme.Normal);
 
+        ColorScheme = scheme;
         SetNeedsDraw();
     }
 

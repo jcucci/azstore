@@ -1,5 +1,6 @@
 using AzStore.Terminal.Theming;
 using AzStore.Terminal.UI.Layout;
+using Microsoft.Extensions.Logging;
 using Terminal.Gui;
 
 namespace AzStore.Terminal.UI.Panes;
@@ -7,12 +8,13 @@ namespace AzStore.Terminal.UI.Panes;
 public abstract class PaneViewBase : FrameView
 {
     private readonly IThemeService _theme;
+    private static ILogger? _logger;
 
     protected PaneViewBase(string title, IThemeService theme)
     {
         Title = title;
         CanFocus = true;
-        TabStop = TabBehavior.TabStop;
+        TabStop = TabBehavior.TabGroup;  // Let chrome handle tab stops
         _theme = theme;
 
         ShadowStyle = ShadowStyle.None;
@@ -41,11 +43,24 @@ public abstract class PaneViewBase : FrameView
         return label;
     }
 
+    public static void SetLogger(ILogger logger)
+    {
+        _logger = logger;
+    }
+
     protected override bool OnKeyDown(Key keyEvent)
     {
-        if (LayoutRootView.IsTraversalKey(keyEvent) && HandleFocusTraversal(keyEvent))
+        _logger?.LogDebug("PaneViewBase '{Title}' OnKeyDown: Key={Key}", Title, keyEvent);
+
+        if (LayoutRootView.IsTraversalKey(keyEvent))
         {
-            return true;
+            _logger?.LogDebug("PaneViewBase '{Title}': Detected traversal key", Title);
+            if (HandleFocusTraversal(keyEvent))
+            {
+                _logger?.LogDebug("PaneViewBase '{Title}': Traversal handled", Title);
+                return true;
+            }
+            _logger?.LogDebug("PaneViewBase '{Title}': Traversal not handled", Title);
         }
 
         return base.OnKeyDown(keyEvent);

@@ -32,7 +32,11 @@ public class TerminalGuiUI : ITerminalUI
         _browserView = new BlobBrowserView(browserLogger, settings.Value.KeyBindings, inputHandler, theme);
         _browserView.NavigationRequested += OnNavigationRequested;
 
-        _layoutRoot = new LayoutRootView(_browserView, theme);
+        var chromeLogger = _loggerFactory.CreateLogger<UI.Panes.PaneChromeView>();
+        var layoutLogger = _loggerFactory.CreateLogger<UI.Layout.LayoutRootView>();
+        var paneLogger = _loggerFactory.CreateLogger<UI.Panes.PaneViewBase>();
+        UI.Panes.PaneViewBase.SetLogger(paneLogger);
+        _layoutRoot = new LayoutRootView(_browserView, theme, chromeLogger, layoutLogger);
     }
 
     private void OnNavigationRequested(object? sender, NavigationResult result)
@@ -56,6 +60,26 @@ public class TerminalGuiUI : ITerminalUI
         _currentNavigationTask?.TrySetResult(result);
     }
 
+    private void OnApplicationKeyDown(object? sender, Key e)
+    {
+        _logger.LogDebug("Application.KeyDown: Key={Key}", e);
+
+        if (e == Key.Tab || e == Key.Tab.WithShift)
+        {
+            _logger.LogDebug("Tab key detected at Application level, handling focus traversal");
+
+            if (_layoutRoot.HandleFocusTraversal(e))
+            {
+                _logger.LogDebug("Focus traversal handled, marking key as handled");
+                e.Handled = true;  // Mark the Key object itself as handled
+            }
+            else
+            {
+                _logger.LogDebug("Focus traversal not handled");
+            }
+        }
+    }
+
     public Task RunAsync(CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Starting Terminal.Gui application");
@@ -64,6 +88,11 @@ public class TerminalGuiUI : ITerminalUI
         {
             Application.Init();
             _isRunning = true;
+
+            // Subscribe to Application.KeyDown before views process keys
+            _logger.LogDebug("Subscribing to Application.KeyDown event");
+            Application.KeyDown += OnApplicationKeyDown;
+            _logger.LogDebug("Successfully subscribed to Application.KeyDown");
 
             var baseScheme = _theme.GetLabelColorScheme(ThemeToken.Background);
 
@@ -77,25 +106,16 @@ public class TerminalGuiUI : ITerminalUI
 
             var top = new Toplevel { ColorScheme = baseScheme };
 
-            var win = new Window
-            {
-                X = 0,
-                Y = 0,
-                Width = Dim.Fill(),
-                Height = Dim.Fill(),
-                Title = string.Empty,
-                ColorScheme = baseScheme
-            };
-
             _layoutRoot.X = 0;
             _layoutRoot.Y = 0;
             _layoutRoot.Width = Dim.Fill();
             _layoutRoot.Height = Dim.Fill();
 
-            win.Add(_layoutRoot);
-            top.Add(win);
+            top.Add(_layoutRoot);
 
             _layoutRoot.ScheduleInitialFocus();
+
+
             Application.Run(top);
         }
         catch (Exception ex)

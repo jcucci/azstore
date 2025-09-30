@@ -1,6 +1,7 @@
 using AzStore.Terminal.Theming;
 using AzStore.Terminal.UI.Focus;
 using AzStore.Terminal.UI.Panes;
+using Microsoft.Extensions.Logging;
 using Terminal.Gui;
 using Tui = global::Terminal.Gui;
 
@@ -13,6 +14,9 @@ public class LayoutRootView : View
     private const int CommandEditorHeight = 3;
 
     private readonly PaneFocusManager _focusManager = new();
+    private readonly ILogger<PaneChromeView>? _chromeLogger;
+    private readonly ILogger<LayoutRootView>? _logger;
+    private readonly List<PaneChromeView> _allChromes = new();
 
     public SessionPaneView SessionPane { get; }
     public StorageAccountPaneView StorageAccountPane { get; }
@@ -24,8 +28,20 @@ public class LayoutRootView : View
     public CommandHistoryPaneView CommandHistoryPane { get; }
     public DownloadsPaneView DownloadsPane { get; }
 
-    public LayoutRootView(BlobBrowserView browserView, IThemeService theme)
+    private PaneChromeView? _sessionChrome;
+    private PaneChromeView? _storageAccountChrome;
+    private PaneChromeView? _containerChrome;
+    private PaneChromeView? _searchChrome;
+    private PaneChromeView? _resultsChrome;
+    private PaneChromeView? _previewChrome;
+    private PaneChromeView? _commandEditorChrome;
+    private PaneChromeView? _commandHistoryChrome;
+    private PaneChromeView? _downloadsChrome;
+
+    public LayoutRootView(BlobBrowserView browserView, IThemeService theme, ILogger<PaneChromeView>? chromeLogger = null, ILogger<LayoutRootView>? logger = null)
     {
+        _chromeLogger = chromeLogger;
+        _logger = logger;
         Width = Dim.Fill();
         Height = Dim.Fill();
         CanFocus = true;
@@ -47,26 +63,26 @@ public class LayoutRootView : View
         };
 
         SessionPane = new SessionPaneView(theme);
-        var sessionPaneChrome = CreateChrome(SessionPane, theme,
+        _sessionChrome = CreateChrome(SessionPane, theme,
             x: 0,
             width: Dim.Percent(25));
 
         StorageAccountPane = new StorageAccountPaneView(theme);
-        var storageAccountPaneChrome = CreateChrome(StorageAccountPane, theme,
-            x: Pos.Right(sessionPaneChrome),
+        _storageAccountChrome = CreateChrome(StorageAccountPane, theme,
+            x: Pos.Right(_sessionChrome),
             width: Dim.Percent(25));
 
         ContainerPane = new ContainerPaneView(theme);
-        var containerPaneChrome = CreateChrome(ContainerPane, theme,
-            x: Pos.Right(storageAccountPaneChrome),
+        _containerChrome = CreateChrome(ContainerPane, theme,
+            x: Pos.Right(_storageAccountChrome),
             width: Dim.Percent(25));
 
         SearchPane = new SearchPaneView(theme);
-        var searchPaneChrome = CreateChrome(SearchPane, theme,
-            x: Pos.Right(containerPaneChrome),
+        _searchChrome = CreateChrome(SearchPane, theme,
+            x: Pos.Right(_containerChrome),
             width: Dim.Fill());
 
-        header.Add(sessionPaneChrome, storageAccountPaneChrome, containerPaneChrome, searchPaneChrome);
+        header.Add(_sessionChrome, _storageAccountChrome, _containerChrome, _searchChrome);
 
         var body = new View
         {
@@ -77,16 +93,16 @@ public class LayoutRootView : View
         };
 
         ResultsPane = new ResultsPaneView(browserView, theme);
-        var resultsPaneChrome = CreateChrome(ResultsPane, theme,
+        _resultsChrome = CreateChrome(ResultsPane, theme,
             x: 0,
             width: Dim.Percent(60));
 
         PreviewPane = new PreviewPaneView(theme);
-        var previewPaneChrome = CreateChrome(PreviewPane, theme,
-            x: Pos.Right(resultsPaneChrome),
+        _previewChrome = CreateChrome(PreviewPane, theme,
+            x: Pos.Right(_resultsChrome),
             width: Dim.Fill());
 
-        body.Add(resultsPaneChrome, previewPaneChrome);
+        body.Add(_resultsChrome, _previewChrome);
 
         var footer = new View
         {
@@ -105,27 +121,27 @@ public class LayoutRootView : View
         };
 
         CommandEditorPane = new CommandEditorPaneView(theme);
-        var commandEditorPaneChrome = CreateChrome(CommandEditorPane, theme,
+        _commandEditorChrome = CreateChrome(CommandEditorPane, theme,
             x: 0,
             width: Dim.Fill(),
             height: CommandEditorHeight);
 
         CommandHistoryPane = new CommandHistoryPaneView(theme);
-        var commandHistoryPaneChrome = CreateChrome(CommandHistoryPane, theme,
+        _commandHistoryChrome = CreateChrome(CommandHistoryPane, theme,
             x: 0,
-            y: Pos.Bottom(commandEditorPaneChrome),
+            y: Pos.Bottom(_commandEditorChrome),
             width: Dim.Fill(),
             height: Dim.Fill());
 
-        footerLeft.Add(commandEditorPaneChrome, commandHistoryPaneChrome);
+        footerLeft.Add(_commandEditorChrome, _commandHistoryChrome);
 
         DownloadsPane = new DownloadsPaneView(theme);
-        var downloadsPaneChrome = CreateChrome(DownloadsPane, theme,
+        _downloadsChrome = CreateChrome(DownloadsPane, theme,
             x: Pos.Right(footerLeft),
             width: Dim.Fill(),
             height: Dim.Fill());
 
-        footer.Add(footerLeft, downloadsPaneChrome);
+        footer.Add(footerLeft, _downloadsChrome);
 
         Add(header, body, footer);
 
@@ -134,45 +150,57 @@ public class LayoutRootView : View
 
     protected override bool OnKeyDown(Key keyEvent)
     {
-        if (HandleFocusTraversal(keyEvent))
-        {
-            return true;
-        }
-
+        _logger?.LogDebug("OnKeyDown: Key={Key}", keyEvent);
         return base.OnKeyDown(keyEvent);
     }
 
     private void RegisterFocusTargets()
     {
-        _focusManager.Register(SessionPane);
-        _focusManager.Register(StorageAccountPane);
-        _focusManager.Register(ContainerPane);
-        _focusManager.Register(SearchPane);
-        _focusManager.Register(ResultsPane);
-        _focusManager.Register(PreviewPane);
-        _focusManager.Register(DownloadsPane);
-        _focusManager.Register(CommandEditorPane);
-        _focusManager.Register(CommandHistoryPane);
+        // Register chrome views and track them all
+        if (_sessionChrome != null) { _focusManager.Register(_sessionChrome); _allChromes.Add(_sessionChrome); }
+        if (_storageAccountChrome != null) { _focusManager.Register(_storageAccountChrome); _allChromes.Add(_storageAccountChrome); }
+        if (_containerChrome != null) { _focusManager.Register(_containerChrome); _allChromes.Add(_containerChrome); }
+        if (_searchChrome != null) { _focusManager.Register(_searchChrome); _allChromes.Add(_searchChrome); }
+        if (_resultsChrome != null) { _focusManager.Register(_resultsChrome); _allChromes.Add(_resultsChrome); }
+        if (_previewChrome != null) { _focusManager.Register(_previewChrome); _allChromes.Add(_previewChrome); }
+        if (_downloadsChrome != null) { _focusManager.Register(_downloadsChrome); _allChromes.Add(_downloadsChrome); }
+        if (_commandEditorChrome != null) { _focusManager.Register(_commandEditorChrome); _allChromes.Add(_commandEditorChrome); }
+        if (_commandHistoryChrome != null) { _focusManager.Register(_commandHistoryChrome); _allChromes.Add(_commandHistoryChrome); }
+    }
+
+    private void SetActiveChrome(PaneChromeView activeChrome)
+    {
+        _logger?.LogDebug("Setting active chrome: {Title}", activeChrome.Title);
+
+        // Update all chromes: active one gets focus scheme, others get normal scheme
+        foreach (var chrome in _allChromes)
+        {
+            chrome.SetActiveState(chrome == activeChrome);
+        }
     }
 
     internal bool HandleFocusTraversal(Key keyEvent)
     {
         if (IsForwardTraversalKey(keyEvent))
         {
-            if (_focusManager.TryGetNext(out var next) && next != null)
+            _logger?.LogDebug("Forward traversal key detected");
+            if (_focusManager.TryGetNext(out var next) && next != null && next is PaneChromeView chrome)
             {
-                next.SetFocus();
+                SetActiveChrome(chrome);
                 return true;
             }
+            _logger?.LogDebug("No next view available");
         }
 
         if (IsBackwardTraversalKey(keyEvent))
         {
-            if (_focusManager.TryGetPrevious(out var previous) && previous != null)
+            _logger?.LogDebug("Backward traversal key detected");
+            if (_focusManager.TryGetPrevious(out var previous) && previous != null && previous is PaneChromeView chrome)
             {
-                previous.SetFocus();
+                SetActiveChrome(chrome);
                 return true;
             }
+            _logger?.LogDebug("No previous view available");
         }
 
         return false;
@@ -182,13 +210,16 @@ public class LayoutRootView : View
     {
         Application.AddIdle(() =>
         {
-            SearchPane.SetFocus();
-            _focusManager.SetCurrent(SearchPane);
+            if (_searchChrome != null)
+            {
+                _searchChrome.SetFocus();
+                _focusManager.SetCurrent(_searchChrome);
+            }
             return false;
         });
     }
 
-    private static PaneChromeView CreateChrome(
+    private PaneChromeView CreateChrome(
         PaneViewBase pane,
         IThemeService theme,
         Pos? x = null,
@@ -196,7 +227,7 @@ public class LayoutRootView : View
         Dim? width = null,
         Dim? height = null)
     {
-        var chrome = new PaneChromeView(pane, theme)
+        var chrome = new PaneChromeView(pane, theme, _chromeLogger)
         {
             X = x ?? 0,
             Y = y ?? 0,
