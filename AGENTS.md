@@ -100,6 +100,69 @@ public class MyCommand : ICommand
 - **Sherlock MCP for .NET APIs**: Whenever you need to inspect types, methods, or properties from external assemblies (e.g., `Terminal.Gui`, Azure SDKs), call the Sherlock MCP server instead of guessing. Use `sherlock__analyze_type` for an overview, `sherlock__get_type_methods` / `sherlock__get_type_properties` for deeper detail, and related helpers as needed. Prefer this before writing code that depends on unfamiliar APIs or when resolving build errors caused by unknown signatures.
 - **Workflow Expectation**: Invoke Sherlock proactively when adding new integrations, adjusting focus/key handling, or encountering compiler errors that mention missing members. Document the findings in your reasoning so future agents understand why specific API members were chosen.
 
+### Terminal.Gui Documentation Resources
+Terminal.Gui is the foundational UI framework for azstore. When working with Terminal.Gui APIs, use these resources efficiently:
+
+#### Primary Resources
+- **GitHub Repository**: https://github.com/gui-cs/Terminal.Gui
+  - Source code and examples
+  - Issue tracking and community discussions
+  - README with getting started information
+- **Official Documentation**: https://gui-cs.github.io/Terminal.Gui/docs/index.html
+  - Comprehensive guides organized into sections
+  - Deep dive articles on key concepts
+  - API reference documentation
+
+#### Documentation Structure
+The documentation is organized into three main sections:
+1. **Getting Started**
+   - Quick start guide for new projects
+   - Migration guide from v1 to v2 (note: azstore uses v2 Alpha)
+   - Overview of new features and API improvements
+2. **Deep Dives** (Technical implementation details)
+   - **Keyboard Handling** (`docs/keyboard.html`): Key bindings, events, scopes, and processing flow
+   - **Views** (`docs/views.html`): View hierarchy, built-in controls, and composition patterns
+   - **Layout Systems**: Positioning and sizing views
+   - **Event Handling**: Application and view-level event patterns
+   - **Navigation**: Focus management and tab order
+   - **Configuration**: Application and view configuration
+   - **Drivers**: Cross-platform console driver architecture
+3. **API Reference**
+   - Detailed API documentation for all types, methods, and properties
+
+#### Key Concepts for azstore Development
+- **Views**: Base UI component type. All UI elements inherit from View (Button, TextField, ListView, etc.)
+- **Key Bindings**: Multi-layered system with Application-level and View-level scopes
+  - HotKey Bindings (e.g., Alt+F for File menu)
+  - Focused Bindings (active when view has focus)
+  - Application Command Key Bindings (global shortcuts)
+- **Key Processing Flow**: "Before", "During", "After" pattern ensures proper event handling hierarchy
+- **Container Views**: Window, FrameView, TabView for organizing UI layout
+- **Data Views**: ListView, TreeView, TableView for displaying collections
+- **Event-Driven Model**: Subscribe to events or use declarative key bindings
+
+#### When to Use Each Resource
+- **Use Sherlock MCP** when:
+  - You need to inspect specific types, methods, or properties from the Terminal.Gui assembly
+  - Resolving compiler errors related to missing members or incorrect signatures
+  - Understanding the exact API surface of a class (constructors, methods, properties, events)
+  - Example: `mcp__dotnet-sherlock__analyze_type` with assembly path and type name like `Terminal.Gui.View`
+- **Use GitHub** when:
+  - Looking for code examples or usage patterns
+  - Checking if a feature is supported or if there are known issues
+  - Finding community discussions about implementation approaches
+- **Use Documentation Website** when:
+  - Learning about architectural concepts (keyboard handling, view lifecycle, layout)
+  - Understanding the "why" behind design patterns
+  - Getting started with new features or understanding migration requirements
+  - Reading conceptual guides before implementation
+
+#### Best Practices
+- **API Discovery Workflow**: Documentation (concepts) → Sherlock MCP (exact APIs) → GitHub (examples/patterns)
+- **Version Awareness**: azstore uses Terminal.Gui v2 Alpha - ensure documentation and examples match v2 API
+- **Cross-Platform Considerations**: Terminal.Gui handles Windows/macOS/Linux differences through driver abstraction
+- **Key Binding Architecture**: Leverage the declarative binding system rather than low-level key event handling when possible
+
 ### Testing Strategy
 - **Test Architecture**: Fixture and Assertions pattern for clean test organization
 - **Mocking**: NSubstitute for dependency substitution

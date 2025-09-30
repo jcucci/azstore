@@ -37,6 +37,57 @@ public class ThemeService : IThemeService
             : ConsoleColor.White;
     }
 
+    private Tui.Color ParseColor(string colorString, bool isBackground = false)
+    {
+        var theme = _settings.CurrentValue.Theme;
+        var alpha = isBackground ? theme.Alpha : 255;
+
+        // Check if it's a hex color
+        if (ThemeSettings.IsHexColor(colorString))
+        {
+            return ParseHexColor(colorString, alpha);
+        }
+
+        // Try to parse as ConsoleColor name
+        if (Enum.TryParse<ConsoleColor>(colorString, true, out var consoleColor))
+        {
+            var tuiColor = MapConsoleToTui(consoleColor);
+            // Apply alpha to the color by reconstructing it with the alpha value
+            return ApplyAlpha(tuiColor, alpha);
+        }
+
+        // Default fallback
+        return new Tui.Color(255, 255, 255, alpha);
+    }
+
+    private static Tui.Color ParseHexColor(string hex, int alpha)
+    {
+        hex = hex.TrimStart('#');
+
+        if (hex.Length != 6)
+        {
+            return new Tui.Color(255, 255, 255, alpha);
+        }
+
+        try
+        {
+            int r = Convert.ToInt32(hex.Substring(0, 2), 16);
+            int g = Convert.ToInt32(hex.Substring(2, 2), 16);
+            int b = Convert.ToInt32(hex.Substring(4, 2), 16);
+
+            return new Tui.Color(r, g, b, alpha);
+        }
+        catch
+        {
+            return new Tui.Color(255, 255, 255, alpha);
+        }
+    }
+
+    private static Tui.Color ApplyAlpha(Tui.Color color, int alpha)
+    {
+        return new Tui.Color(color.R, color.G, color.B, alpha);
+    }
+
     public void Write(string text, ThemeToken token)
     {
         var original = Console.ForegroundColor;
@@ -55,16 +106,33 @@ public class ThemeService : IThemeService
 
     public Tui.Attribute ResolveTui(ThemeToken token)
     {
-        var fgConsole = ResolveForeground(token);
-        var fg = MapConsoleToTui(fgConsole);
-        var bg = ResolveBackground();
+        var theme = _settings.CurrentValue.Theme;
+        var colorString = token switch
+        {
+            ThemeToken.Background => theme.BackgroundColor,
+            ThemeToken.Prompt => theme.PromptColor,
+            ThemeToken.Status => theme.StatusMessageColor,
+            ThemeToken.Error => theme.ErrorColor,
+            ThemeToken.Selection => theme.SelectedItemColor,
+            ThemeToken.Title => theme.TitleColor,
+            ThemeToken.Breadcrumb => theme.BreadcrumbColor,
+            ThemeToken.ItemContainer => theme.ContainerColor,
+            ThemeToken.ItemBlob => theme.BlobColor,
+            ThemeToken.PagerInfo => theme.PagerInfoColor,
+            ThemeToken.Input => theme.InputColor,
+            _ => nameof(ConsoleColor.White)
+        };
+
+        var fg = ParseColor(colorString, isBackground: false);
+        var bg = ParseColor(theme.BackgroundColor, isBackground: true);
         return new Tui.Attribute(fg, bg);
     }
 
     public Tui.ColorScheme GetListColorScheme()
     {
         // Selection as background highlight with contrasting foreground
-        var selBg = MapConsoleToTui(ResolveForeground(ThemeToken.Selection));
+        var theme = _settings.CurrentValue.Theme;
+        var selBg = ParseColor(theme.SelectedItemColor, isBackground: false);
         var selFg = GetContrastingForeground(selBg);
 
         return new Tui.ColorScheme
@@ -73,7 +141,7 @@ public class ThemeService : IThemeService
             Focus = new Tui.Attribute(selFg, selBg),
             HotNormal = ResolveTui(ThemeToken.ItemContainer),
             HotFocus = new Tui.Attribute(selFg, selBg),
-            Disabled = new Tui.Attribute(Tui.Color.DarkGray, Tui.Color.Black)
+            Disabled = new Tui.Attribute(new Tui.Color(169, 169, 169, 255), ParseColor(theme.BackgroundColor, isBackground: true))
         };
     }
 
@@ -96,7 +164,7 @@ public class ThemeService : IThemeService
             ? nameof(ConsoleColor.Black)
             : theme.BackgroundColor;
 
-        return MapConsoleToTui(Enum.TryParse<ConsoleColor>(name, true, out var c) ? c : ConsoleColor.Black);
+        return ParseColor(name, isBackground: true);
     }
 
     private static Tui.Color MapConsoleToTui(ConsoleColor color) => color switch
