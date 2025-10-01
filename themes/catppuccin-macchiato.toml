@@ -1,15 +1,17 @@
-# Catppuccin Macchiato (dark) — ConsoleColor approximations
+# Catppuccin Macchiato (dark) — True colors using hex values
 # Reference: https://github.com/catppuccin/catppuccin
 
 [AzStore.theme]
-prompt_color = "Green"          # teal leaning
-status_message_color = "Cyan"
-error_color = "Red"
-selection_color = "Yellow"
-breadcrumb_color = "DarkGray"
-container_color = "Blue"
-blob_color = "White"
-title_color = "White"
-pager_info_color = "DarkGray"
-input_color = "White"
+prompt_color = "#91d7e3"           # sky
+status_message_color = "#8bd5ca"   # teal
+error_color = "#ed8796"            # red
+selection_color = "#c6a0f6"        # mauve
+breadcrumb_color = "#6e738d"       # overlay0
+container_color = "#8aadf4"        # blue
+blob_color = "#cad3f5"             # text
+title_color = "#b7bdf8"            # lavender
+pager_info_color = "#5b6078"       # surface2
+input_color = "#cad3f5"            # text
+background_color = "#24273a"       # base
+alpha = 255                        # fully opaque
 

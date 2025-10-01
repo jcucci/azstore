@@ -2,11 +2,12 @@ using AzStore.Core.Models.Navigation;
 using AzStore.Core.Models.Storage;
 using AzStore.Terminal.Input;
 using AzStore.Terminal.Navigation;
-using Microsoft.Extensions.Logging;
-using Terminal.Gui;
-using System.Collections.ObjectModel;
-using KeyBindingsConfig = AzStore.Configuration.KeyBindings;
 using AzStore.Terminal.Theming;
+using AzStore.Terminal.UI.Layout;
+using Microsoft.Extensions.Logging;
+using System.Collections.ObjectModel;
+using Terminal.Gui;
+using KeyBindingsConfig = AzStore.Configuration.KeyBindings;
 
 namespace AzStore.Terminal.UI;
 
@@ -94,6 +95,33 @@ public class BlobBrowserView : View
         {
             _inputHandler.ProcessKeyEvent(keyEvent);
         };
+    }
+
+    protected override bool OnKeyDown(Key keyEvent)
+    {
+        if (LayoutRootView.IsTraversalKey(keyEvent) && HandleFocusTraversal(keyEvent))
+        {
+            return true;
+        }
+
+        return base.OnKeyDown(keyEvent);
+    }
+
+    private bool HandleFocusTraversal(Key keyEvent)
+    {
+        View? current = this;
+
+        while (current != null)
+        {
+            if (current is LayoutRootView layout)
+            {
+                return layout.HandleFocusTraversal(keyEvent);
+            }
+
+            current = current.SuperView;
+        }
+
+        return false;
     }
 
     private void OnNavigationRequested(object? sender, NavigationResult result)

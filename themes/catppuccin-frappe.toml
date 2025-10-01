@@ -1,15 +1,17 @@
-# Catppuccin Frappé (dark) — ConsoleColor approximations
+# Catppuccin Frappé (dark) — True colors using hex values
 # Reference: https://github.com/catppuccin/catppuccin
 
 [AzStore.theme]
-prompt_color = "Cyan"           # sky / sapphire
-status_message_color = "Blue"   # calm status
-error_color = "Red"
-selection_color = "Yellow"
-breadcrumb_color = "DarkGray"
-container_color = "Blue"
-blob_color = "White"
-title_color = "White"
-pager_info_color = "DarkGray"
-input_color = "White"
+prompt_color = "#99d1db"           # sky
+status_message_color = "#81c8be"   # teal
+error_color = "#e78284"            # red
+selection_color = "#ca9ee6"        # mauve
+breadcrumb_color = "#737994"       # overlay0
+container_color = "#8caaee"        # blue
+blob_color = "#c6d0f5"             # text
+title_color = "#babbf1"            # lavender
+pager_info_color = "#626880"       # surface2
+input_color = "#c6d0f5"            # text
+background_color = "#303446"       # base
+alpha = 255                        # fully opaque
 
