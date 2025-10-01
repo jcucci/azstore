@@ -77,7 +77,11 @@ public class ThemeService : IThemeService
 
             return new Tui.Color(r, g, b, alpha);
         }
-        catch
+        catch (FormatException)
+        {
+            return new Tui.Color(255, 255, 255, alpha);
+        }
+        catch (ArgumentException)
         {
             return new Tui.Color(255, 255, 255, alpha);
         }

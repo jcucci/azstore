@@ -157,15 +157,26 @@ public class LayoutRootView : View
     private void RegisterFocusTargets()
     {
         // Register chrome views in tab order: Sessions -> Storage Account -> Container -> Search -> Results -> Preview -> Command -> History -> Downloads
-        if (_sessionChrome != null) { _focusManager.Register(_sessionChrome); _allChromes.Add(_sessionChrome); }
-        if (_storageAccountChrome != null) { _focusManager.Register(_storageAccountChrome); _allChromes.Add(_storageAccountChrome); }
-        if (_containerChrome != null) { _focusManager.Register(_containerChrome); _allChromes.Add(_containerChrome); }
-        if (_searchChrome != null) { _focusManager.Register(_searchChrome); _allChromes.Add(_searchChrome); }
-        if (_resultsChrome != null) { _focusManager.Register(_resultsChrome); _allChromes.Add(_resultsChrome); }
-        if (_previewChrome != null) { _focusManager.Register(_previewChrome); _allChromes.Add(_previewChrome); }
-        if (_commandEditorChrome != null) { _focusManager.Register(_commandEditorChrome); _allChromes.Add(_commandEditorChrome); }
-        if (_commandHistoryChrome != null) { _focusManager.Register(_commandHistoryChrome); _allChromes.Add(_commandHistoryChrome); }
-        if (_downloadsChrome != null) { _focusManager.Register(_downloadsChrome); _allChromes.Add(_downloadsChrome); }
+        var chromes = new PaneChromeView?[]
+        {
+            _sessionChrome,
+            _storageAccountChrome,
+            _containerChrome,
+            _searchChrome,
+            _resultsChrome,
+            _previewChrome,
+            _commandEditorChrome,
+            _commandHistoryChrome,
+            _downloadsChrome
+        };
+        foreach (var chrome in chromes)
+        {
+            if (chrome != null)
+            {
+                _focusManager.Register(chrome);
+                _allChromes.Add(chrome);
+            }
+        }
     }
 
     private void SetActiveChrome(PaneChromeView activeChrome)

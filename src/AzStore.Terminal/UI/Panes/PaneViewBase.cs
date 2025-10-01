@@ -8,14 +8,15 @@ namespace AzStore.Terminal.UI.Panes;
 public abstract class PaneViewBase : FrameView
 {
     private readonly IThemeService _theme;
-    private static ILogger? _logger;
+    protected readonly ILogger? Logger;
 
-    protected PaneViewBase(string title, IThemeService theme)
+    protected PaneViewBase(string title, IThemeService theme, ILogger? logger = null)
     {
         Title = title;
         CanFocus = true;
         TabStop = TabBehavior.TabGroup;  // Let chrome handle tab stops
         _theme = theme;
+        Logger = logger;
 
         ShadowStyle = ShadowStyle.None;
 
@@ -43,24 +44,19 @@ public abstract class PaneViewBase : FrameView
         return label;
     }
 
-    public static void SetLogger(ILogger logger)
-    {
-        _logger = logger;
-    }
-
     protected override bool OnKeyDown(Key keyEvent)
     {
-        _logger?.LogDebug("PaneViewBase '{Title}' OnKeyDown: Key={Key}", Title, keyEvent);
+        Logger?.LogDebug("PaneViewBase '{Title}' OnKeyDown: Key={Key}", Title, keyEvent);
 
         if (LayoutRootView.IsTraversalKey(keyEvent))
         {
-            _logger?.LogDebug("PaneViewBase '{Title}': Detected traversal key", Title);
+            Logger?.LogDebug("PaneViewBase '{Title}': Detected traversal key", Title);
             if (HandleFocusTraversal(keyEvent))
             {
-                _logger?.LogDebug("PaneViewBase '{Title}': Traversal handled", Title);
+                Logger?.LogDebug("PaneViewBase '{Title}': Traversal handled", Title);
                 return true;
             }
-            _logger?.LogDebug("PaneViewBase '{Title}': Traversal not handled", Title);
+            Logger?.LogDebug("PaneViewBase '{Title}': Traversal not handled", Title);
         }
 
         return base.OnKeyDown(keyEvent);
