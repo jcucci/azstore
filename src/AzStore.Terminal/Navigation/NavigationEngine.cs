@@ -99,6 +99,15 @@ public class NavigationEngine : INavigationEngine
         _logger.LogInformation("Initializing navigation for session: {SessionName}", session.Name);
 
         _currentSession = session;
+
+        // Only initialize navigation if the session has a storage account
+        if (string.IsNullOrEmpty(session.StorageAccountName))
+        {
+            _logger.LogWarning("Session {SessionName} has no storage account. Navigation not initialized.", session.Name);
+            _currentState = null;
+            return;
+        }
+
         var previousState = _currentState;
         _currentState = NavigationState.CreateAtRoot(session.Name, session.StorageAccountName);
 

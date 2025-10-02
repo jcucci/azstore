@@ -2,12 +2,9 @@ using AzStore.Configuration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
 using Serilog;
 using Serilog.Core;
-using Serilog.Formatting.Compact;
 using System.CommandLine;
-using System.CommandLine.Parsing;
 using Tomlyn.Extensions.Configuration;
 
 namespace AzStore.CLI;
@@ -33,10 +30,11 @@ public class Program
             CommandLineOptions.FileLogging,
             CommandLineOptions.LogFile,
             CommandLineOptions.Verbose,
-            CommandLineOptions.Quiet
+            CommandLineOptions.Quiet,
+            CommandLineOptions.Session
         };
 
-        rootCommand.SetAction(async (parseResult, cancellationToken) => 
+        rootCommand.SetAction(async (parseResult, cancellationToken) =>
         {
             await RunApplication(parseResult);
             return 0;
@@ -47,16 +45,19 @@ public class Program
     private static async Task RunApplication(ParseResult parseResult)
     {
         var parsedArgs = CommandLineOptions.ExtractConfigurationValues(parseResult);
+        var sessionName = parseResult.GetValue(CommandLineOptions.Session);
         var builder = Host.CreateApplicationBuilder();
-        
+
         ConfigureConfiguration(builder.Configuration, parsedArgs);
         var consoleLevelSwitch = new LoggingLevelSwitch();
         ConfigureSerilog(builder.Configuration, consoleLevelSwitch);
-        
+
         builder.Services.AddSerilog();
         // Make the console level switch and console log scope available to services
         builder.Services.AddSingleton(consoleLevelSwitch);
-        builder.Services.AddSingleton<AzStore.Terminal.Utilities.IConsoleLogScope>(sp => new SerilogConsoleLogScope(consoleLevelSwitch));
+        builder.Services.AddSingleton<Terminal.Utilities.IConsoleLogScope>(sp => new SerilogConsoleLogScope(consoleLevelSwitch));
+        // Register the session name from command line for TuiHostedService
+        builder.Services.AddSingleton(new SessionNameProvider(sessionName));
         builder.Services.AddAzStoreServices();
 
         var host = builder.Build();
@@ -94,7 +95,7 @@ public class Program
         {
             Console.WriteLine($"Warning: Cannot access configuration directory: {ex.Message}");
             Console.WriteLine("Using default configuration without file-based settings.");
-            
+
             configuration
                 .AddJsonFile("appsettings.json", optional: true)
                 .AddEnvironmentVariables("AZSTORE_")
@@ -104,7 +105,7 @@ public class Program
         {
             Console.WriteLine($"Warning: Configuration directory setup failed: {ex.Message}");
             Console.WriteLine("Using default configuration without file-based settings.");
-            
+
             configuration
                 .AddJsonFile("appsettings.json", optional: true)
                 .AddEnvironmentVariables("AZSTORE_")
@@ -135,7 +136,7 @@ public class Program
             {
                 var logFilePath = loggingSettings.LogFilePath ?? GetDefaultLogFilePath();
                 var logDirectory = Path.GetDirectoryName(logFilePath);
-                
+
                 if (!string.IsNullOrEmpty(logDirectory))
                 {
                     Directory.CreateDirectory(logDirectory);
@@ -175,7 +176,7 @@ public class Program
             configDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             configDir = Path.Combine(configDir, ".config");
         }
-        
+
         return Path.Combine(configDir, "azstore");
     }
 
