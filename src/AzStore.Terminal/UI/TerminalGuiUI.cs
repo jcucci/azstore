@@ -35,7 +35,6 @@ public class TerminalGuiUI : ITerminalUI
         var chromeLogger = _loggerFactory.CreateLogger<UI.Panes.PaneChromeView>();
         var layoutLogger = _loggerFactory.CreateLogger<UI.Layout.LayoutRootView>();
         var paneLogger = _loggerFactory.CreateLogger<UI.Panes.PaneViewBase>();
-        UI.Panes.PaneViewBase.SetLogger(paneLogger);
         _layoutRoot = new LayoutRootView(_browserView, theme, chromeLogger, layoutLogger);
     }
 

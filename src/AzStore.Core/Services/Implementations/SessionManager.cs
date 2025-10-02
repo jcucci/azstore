@@ -50,18 +50,18 @@ public class SessionManager : ISessionManager
     }
 
     /// <inheritdoc/>
-    public async Task<Session> CreateSessionAsync(string name, string storageAccountName, Guid subscriptionId, CancellationToken cancellationToken = default)
+    public async Task<Session> CreateSessionAsync(string name, string? storageAccountName, Guid subscriptionId, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentException.ThrowIfNullOrWhiteSpace(storageAccountName);
 
         if (name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
             throw new ArgumentException($"Session name contains invalid characters: {name}", nameof(name));
 
-        if (!IsValidStorageAccountName(storageAccountName))
+        if (!string.IsNullOrWhiteSpace(storageAccountName) && !IsValidStorageAccountName(storageAccountName))
             throw new ArgumentException($"Storage account name is invalid. Must be 3-24 characters, lowercase letters and numbers only: {storageAccountName}", nameof(storageAccountName));
 
-        _logger.LogInformation("Creating session: {SessionName} for storage account: {StorageAccount}", name, storageAccountName);
+        var accountInfo = string.IsNullOrEmpty(storageAccountName) ? "no account" : $"storage account: {storageAccountName}";
+        _logger.LogInformation("Creating session: {SessionName} with {AccountInfo}", name, accountInfo);
 
         if (_sessions.ContainsKey(name))
             throw new InvalidOperationException($"Session '{name}' already exists");

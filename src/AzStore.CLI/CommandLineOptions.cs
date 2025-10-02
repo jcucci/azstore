@@ -1,12 +1,11 @@
 using System.CommandLine;
-using System.CommandLine.Parsing;
 
 namespace AzStore.CLI;
 
 public static class CommandLineOptions
 {
     public static Option<string?> SessionsDirectory =>
-        new(name: "--sessions-dir", aliases: ["-s"])
+        new(name: "--sessions-dir")
         {
             HelpName = "path",
             Description = "Override the directory where session data is stored"
@@ -62,6 +61,13 @@ public static class CommandLineOptions
         new(name: "--quiet", aliases: ["-q"])
         {
             Description = "Enable quiet mode (warnings and errors only)"
+        };
+
+    public static Option<string?> Session =>
+        new(name: "--session", aliases: ["-s"])
+        {
+            HelpName = "name",
+            Description = "Specify the session name to open or create on startup"
         };
 
     public static Dictionary<string, string?> ExtractConfigurationValues(ParseResult parseResult)

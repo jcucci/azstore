@@ -11,14 +11,14 @@ public interface ISessionManager
     /// Creates a new session with the specified parameters.
     /// </summary>
     /// <param name="name">The name of the session for user identification.</param>
-    /// <param name="storageAccountName">The Azure Storage account name for this session.</param>
+    /// <param name="storageAccountName">The Azure Storage account name for this session (optional - can be set later).</param>
     /// <param name="subscriptionId">The Azure subscription ID associated with this session.</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>The newly created session.</returns>
-    /// <exception cref="ArgumentException">Thrown when any required parameter is null or empty.</exception>
+    /// <exception cref="ArgumentException">Thrown when the name is null or empty, or when the storage account name is invalid.</exception>
     /// <exception cref="InvalidOperationException">Thrown when a session with the same name already exists.</exception>
     /// <exception cref="DirectoryNotFoundException">Thrown when the session directory cannot be created.</exception>
-    Task<Session> CreateSessionAsync(string name, string storageAccountName, Guid subscriptionId, CancellationToken cancellationToken = default);
+    Task<Session> CreateSessionAsync(string name, string? storageAccountName, Guid subscriptionId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Gets an existing session by name.

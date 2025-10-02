@@ -159,7 +159,8 @@ public class SessionCommand : ICommand
             {
                 var isActive = session.Name == activeSession?.Name ? " (active)" : "";
                 var lastAccessed = session.LastAccessedAt.ToString("yyyy-MM-dd HH:mm");
-                message += $"  {session.Name}{isActive} - {session.StorageAccountName} - {lastAccessed}\n";
+                var accountInfo = string.IsNullOrEmpty(session.StorageAccountName) ? "no account" : session.StorageAccountName;
+                message += $"  {session.Name}{isActive} - {accountInfo} - {lastAccessed}\n";
                 message += $"    Directory: {session.Directory}\n";
             }
 
@@ -193,7 +194,8 @@ public class SessionCommand : ICommand
             await _sessionManager.TouchSessionAsync(sessionName, cancellationToken);
             _sessionManager.SetActiveSession(session);
 
-            return CommandResult.Ok($"Switched to session '{sessionName}' for storage account '{session.StorageAccountName}'");
+            var accountInfo = string.IsNullOrEmpty(session.StorageAccountName) ? "no storage account set" : $"storage account '{session.StorageAccountName}'";
+            return CommandResult.Ok($"Switched to session '{sessionName}' ({accountInfo})");
         }
         catch (Exception ex)
         {
@@ -245,7 +247,8 @@ public class SessionCommand : ICommand
             }
 
             var message = $"Current session: {activeSession.Name}\n";
-            message += $"Storage account: {activeSession.StorageAccountName}\n";
+            var accountInfo = string.IsNullOrEmpty(activeSession.StorageAccountName) ? "none" : activeSession.StorageAccountName;
+            message += $"Storage account: {accountInfo}\n";
             message += $"Directory: {activeSession.Directory}\n";
             message += $"Created: {activeSession.CreatedAt:yyyy-MM-dd HH:mm}\n";
             message += $"Last accessed: {activeSession.LastAccessedAt:yyyy-MM-dd HH:mm}";
